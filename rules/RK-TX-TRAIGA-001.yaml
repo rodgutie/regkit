@@ -1,0 +1,216 @@
+# RegKit Rule: RK-TX-TRAIGA-001
+# Texas TRAIGA (HB 149) — Prohibited AI practices + NIST AI RMF safe harbor
+#
+# Legal basis: Texas HB 149, the Responsible Artificial Intelligence
+# Governance Act, codified at Tex. Bus. & Com. Code §§ 552-554
+# Effective: January 1, 2026 — ACTIVELY ENFORCEABLE (unlike Colorado's
+# successor law, TRAIGA is NOT currently stayed by litigation)
+#
+# CRITICAL DISTINCTION FROM EVERY OTHER RULE IN THIS RULE SET:
+# TRAIGA is INTENT-BASED, not impact-based. This is the single most
+# important thing to get right, and it's the opposite design philosophy
+# from the EU AI Act, Colorado's old SB 24-205, and most other frameworks
+# RegKit covers. Per the statute itself (§ 552.056(c)): disparate impact
+# ALONE is explicitly insufficient to demonstrate intent to discriminate.
+#
+# This means RK-TX-TRAIGA-001 CANNOT simply detect "AI makes a decision
+# that disproportionately affects a protected class" and flag a violation
+# — that is exactly the wrong standard under this specific statute, even
+# though it's close to the right standard under several OTHER rules in
+# this same rule set (see RK-GDPR-022, RK-EUAI-014). A rule engine that
+# applies one harmonized "discrimination" standard across all jurisdictions
+# would be WRONG under Texas law specifically. This is why AGENT-1's
+# jurisdiction classification has to gate which detection logic runs —
+# not just which document templates get used.
+
+id: RK-TX-TRAIGA-001
+name: "AI system may fall within TRAIGA prohibited practices, or lacks NIST AI RMF safe harbor documentation"
+severity: WARN
+  # WARN, not BLOCK, because: (1) the intent standard means RegKit cannot
+  # determine from code alone whether prohibited intent existed — that is
+  # an organizational/legal fact, not a code fact, similar to the
+  # "meaningfulness" problem in RK-GDPR-022; (2) the primary practical
+  # value RegKit offers here is helping a company BUILD the NIST safe
+  # harbor defense proactively, which is an opportunity, not a violation.
+
+regulation:
+  framework: "Texas TRAIGA (HB 149)"
+  citation: "Tex. Bus. & Com. Code §§ 552-554"
+  effective_date: "January 1, 2026 — currently enforceable, not stayed"
+  enforcement_authority: "Texas Attorney General — exclusive authority, no private right of action"
+  penalty_structure:
+    curable_violation: "$10,000 to $12,000"
+    uncurable_violation: "$80,000 to $200,000"
+    continuing_violation: "$2,000 to $40,000 per day"
+  cure_period: >
+    60-day cure period under § 552.107. The AG must send written notice of
+    violation; the recipient has 60 days to respond/cure before an
+    enforcement action can be brought. A complete and timely cure,
+    certified in writing, bars civil action for the noticed violation.
+  liability_standard: >
+    Intent-based, NOT disparate-impact-based. § 552.056(c) explicitly
+    states disparate impact alone is insufficient to demonstrate intent
+    to discriminate. This is a materially different (and narrower)
+    standard than most other AI discrimination frameworks RegKit covers.
+  summary: >
+    TRAIGA prohibits developing or deploying an AI system WITH THE INTENT
+    to: manipulate human behavior to encourage self-harm, harm to others,
+    or criminal activity; infringe constitutional rights guaranteed under
+    the US Constitution; or unlawfully discriminate against a protected
+    class. It also prohibits AI systems intended to produce or distribute
+    child sexual abuse material or unlawful deepfakes. The statute provides
+    a safe harbor: substantial compliance with the NIST AI RMF (including
+    the GenAI Profile) is an affirmative defense under § 552.105.
+
+detection:
+  prohibited_practice_screening:
+    # Note the framing: this section flags PATTERNS WORTH HUMAN REVIEW for
+    # possible prohibited intent — it does NOT claim to detect intent
+    # itself, which RegKit is explicit it cannot do from code alone.
+    - practice: "behavioral manipulation toward self-harm or harm to others"
+      detection_signal: >
+        AST patterns suggesting deliberately persuasive/manipulative output
+        framing combined with sensitive-topic content generation (mental
+        health, self-harm keywords) without safety-layer moderation calls
+        present in the pipeline. Flags for human review — cannot determine
+        intent from code structure alone.
+    - practice: "infringement of constitutional rights"
+      detection_signal: >
+        AI system outputs that filter, censor, or restrict access to
+        services based on protected speech or association categories.
+        Flags for human/legal review.
+    - practice: "unlawful discrimination against a protected class"
+      detection_signal: >
+        Same proxy-variable detection used in RK-GDPR-022 and the fintech
+        rule pack (zip code, surname pattern, etc. as protected-class
+        proxies) — BUT explicitly logged with a note that proxy presence
+        alone does NOT establish TRAIGA liability per § 552.056(c). This
+        finding is informational/WARN only under this specific rule,
+        even though the identical code pattern might be BLOCK-severity
+        under RK-GDPR-022 or an EU AI Act rule for the same codebase.
+    - practice: "CSAM or unlawful deepfake generation"
+      detection_signal: >
+        Image/video generation calls with no detectable content-safety
+        filter layer, in combination with face-swap or likeness-generation
+        capability. This is the one sub-category where RegKit treats the
+        finding more seriously (escalate toward BLOCK) because the conduct
+        itself — not just disparate outcome — is what the statute targets,
+        and technical absence of a safety filter is itself probative.
+
+  nist_safe_harbor_check:
+    description: >
+      Independent of prohibited-practice screening, RegKit checks whether
+      the project has the NIST AI RMF documentation that would support the
+      § 552.105 affirmative defense if ever needed.
+    checks:
+      - "GOVERN function: documented AI governance policy present in repo or regkit.yaml reference"
+      - "MAP function: risk identification documentation for this specific AI system"
+      - "MEASURE function: evidence of testing — red-teaming, adversarial testing, or audit logs (regkit.trace() presence counts)"
+      - "MANAGE function: documented incident response / remediation process"
+    if_missing: >
+      WARN-level finding: "No NIST AI RMF documentation detected for this
+      system. Building this now creates the §552.105 affirmative defense
+      available to you in the event of any future TRAIGA inquiry — RegKit
+      can scaffold this automatically (see auto_fix below)."
+
+jurisdiction_check:
+  description: >
+    TRAIGA applies broadly — to any person conducting business in Texas,
+    producing a product/service used by Texas residents, or developing/
+    deploying AI in Texas, REGARDLESS of where the deployer or developer
+    is located. RegKit treats this as effectively nationwide for any US
+    consumer-facing product unless regkit.yaml explicitly excludes Texas
+    users (rare and hard to enforce technically, so default is inclusive).
+
+false_positive_guards:
+  - >
+    Disparate impact findings alone are NEVER escalated to BLOCK under this
+    specific rule, per § 552.056(c). If the same codebase also triggers
+    RK-GDPR-022 or an EU AI Act rule on the identical code pattern, those
+    OTHER rules may reach BLOCK severity — this rule independently stays
+    at WARN or below for the TRAIGA-specific finding. Document both
+    findings separately; do not let one jurisdiction's severity override
+    another's in the evidence package.
+  - >
+    A company is not liable merely because a third party misuses the AI
+    system in a prohibited way that the system was not designed or intended
+    to enable — RegKit does not flag generic "could theoretically be
+    misused" scenarios; it requires a closer fit to actual prohibited intent
+    indicators.
+  - >
+    The NIST safe-harbor check is informational/opportunity framing, not a
+    violation framing — absence of NIST documentation is not itself
+    unlawful; it just forfeits an available affirmative defense.
+
+message:
+  developer_facing: >
+    RegKit detected a pattern in this {practice_category} code worth review
+    against TRAIGA's prohibited-practice list. IMPORTANT: under Texas law,
+    disparate impact or pattern presence alone does NOT establish a
+    violation — TRAIGA requires proof of intent. This finding is a
+    flag for human/legal review of intent, not an automated determination
+    of liability. Separately, RegKit found {nist_gap_summary} — building
+    this documentation now would establish your § 552.105 NIST safe harbor
+    affirmative defense.
+
+  auto_fix_available: true
+  auto_fix_description: >
+    For the NIST safe harbor gap: RegKit scaffolds GOVERN/MAP/MEASURE/MANAGE
+    documentation stubs reusing the same NIST AI RMF Conformance Report
+    generator used elsewhere in RegKit (see evidence_contribution below) —
+    this is the same underlying document, just framed here for its TRAIGA
+    affirmative-defense value specifically.
+    For prohibited-practice flags: no auto-fix offered — intent determination
+    requires human/legal judgment, not code generation.
+
+evidence_contribution:
+  - document: "NIST AI RMF Conformance Report"
+    section: "Cross-referenced as TRAIGA § 552.105 affirmative defense evidence"
+    note: >
+      This is the SAME document RegKit generates for general NIST
+      conformance purposes — RegKit cross-references it here rather than
+      generating a separate document, since the underlying evidence
+      (GOVERN/MAP/MEASURE/MANAGE documentation) is identical. One document,
+      multiple regulatory uses — this is a recurring efficiency across
+      RegKit's evidence engine.
+
+monitoring_note_for_agent_7: >
+  Watch capitol.texas.gov and the Texas AG's office for: (1) any AG
+  enforcement actions or guidance that clarify what "intent" evidence the
+  AG considers sufficient in practice (the statute itself is sparse on
+  this), (2) the federal December 11, 2025 Executive Order directing a DOJ
+  AI Litigation Task Force to challenge state AI laws on constitutional
+  grounds — track whether TRAIGA specifically becomes a target the way
+  Colorado's law did, (3) Texas Artificial Intelligence Advisory Council
+  recommendations, which could shape future amendments even though the
+  Council itself has no rulemaking authority.
+
+test_cases:
+  should_flag_for_review_not_block:
+    - code: |
+        async function screenLoanApplicant(application) {
+          const score = await mlModel.predict([application.zipCode, application.income]);
+          return score > threshold;
+        }
+      finding: >
+        Proxy variable (zip code) present — flagged for human review per
+        this rule's WARN posture, NOT auto-escalated to BLOCK, because
+        disparate impact / proxy presence alone is insufficient under
+        § 552.056(c). Compare: the SAME code triggers a BLOCK-level finding
+        under RK-GDPR-022 or an EU AI Act fintech rule if those frameworks
+        also apply to this deployment.
+
+  should_not_trigger:
+    - code: |
+        const response = await llm.complete(customerServicePrompt);
+        return response;
+      reason: "Generic customer service chatbot — no prohibited-practice signal present"
+
+  nist_gap_example:
+    - scenario: >
+        A hiring-screening AI system with no audit logging, no documented
+        risk assessment, and no red-team testing evidence in the repo.
+      finding: >
+        WARN — NIST safe harbor gap. RegKit offers to scaffold GOVERN/MAP/
+        MEASURE/MANAGE documentation, framed explicitly as building the
+        § 552.105 affirmative defense before any AG inquiry occurs.
