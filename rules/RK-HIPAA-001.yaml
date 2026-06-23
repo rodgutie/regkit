@@ -1,0 +1,110 @@
+# RegKit Rule: RK-HIPAA-001
+# HIPAA Business Associate Agreement required before PHI reaches an AI vendor
+#
+# Legal basis: 45 CFR § 164.502(e) and § 164.504(e)
+# A covered entity may not disclose PHI to a business associate (including an
+# AI API vendor such as OpenAI or Anthropic) unless it has obtained
+# "satisfactory assurances" — documented through a signed BAA — that the
+# vendor will safeguard the information. This is one of the most frequently
+# violated HIPAA requirements because teams adopt new AI vendors faster than
+# their compliance review process can keep up.
+
+id: RK-HIPAA-001
+name: "PHI sent to AI vendor without a signed Business Associate Agreement"
+severity: BLOCK
+
+regulation:
+  framework: HIPAA
+  citation: "45 CFR § 164.502(e), § 164.504(e)"
+  summary: >
+    A covered entity or business associate may not disclose protected health
+    information (PHI) to a third party — including an AI/LLM API vendor —
+    unless a written Business Associate Agreement (BAA) is in place that
+    meets the requirements of § 164.504(e). Oral or implied agreements do
+    not satisfy this requirement; the BAA must be a written, signed contract.
+  penalty: "Up to $1.9M per violation category per year (HHS OCR civil penalty tiers)"
+
+detection:
+  # What RegKit's AST analyzer looks for
+  trigger_conditions:
+    - description: "A variable or object classified as PHI (via AGENT-1 context tagging or explicit project schema) is passed as an argument to a recognized AI vendor SDK call"
+      ai_vendor_sdks:
+        - "openai.chat.completions.create"
+        - "openai.responses.create"
+        - "anthropic.messages.create"
+        - "google.generativeai.*"
+        - "cohere.chat"
+      phi_indicators:
+        - variable names matching: patient, diagnosis, medical_record, health_record, treatment, prescription, mrn, hipaa
+        - data sourced from a table/model flagged `phi: true` in regkit.yaml
+        - data sourced from a field flagged in a `@phi` code annotation
+
+  cross_check:
+    # This is what AGENT-2 looks up before AGENT-3 confirms a real violation
+    - source: regkit.yaml
+      field: "ai_vendors[].baa_signed"
+      logic: >
+        If the vendor receiving the PHI-tagged data does NOT have
+        `baa_signed: true` in the project's regkit.yaml vendor config,
+        this is a confirmed BLOCK-level violation. If `baa_signed: true`,
+        no violation — RegKit assumes the BAA is in force and does not
+        re-litigate contract validity (that is a human/legal job).
+
+false_positive_guards:
+  # What keeps this rule from crying wolf — the difference between a linter and a legal reasoning engine
+  - "Treatment-purpose disclosures to a healthcare provider are exempt under § 164.502(e) — RegKit does not flag PHI passed between two internal systems both tagged as covered-entity-owned"
+  - "De-identified data (per § 164.514 Safe Harbor or Expert Determination) is not PHI — if a field is tagged `deidentified: true` in regkit.yaml, this rule does not trigger"
+  - "Research disclosures under a documented § 164.512(i) waiver are exempt — flagged via `research_waiver: true` config"
+
+message:
+  developer_facing: >
+    This code sends data tagged as PHI to {vendor_name}, but your project
+    config shows no signed Business Associate Agreement with this vendor.
+    Under HIPAA (45 CFR § 164.502(e)), PHI cannot be disclosed to a business
+    associate — including AI API providers — without a written BAA in place.
+    Penalties can reach $1.9M per violation category per year.
+
+  suggested_fix: >
+    Option 1: Switch to an AI vendor your organization has a signed BAA with
+    (check regkit.yaml under ai_vendors for vendors marked baa_signed: true).
+    Option 2: If you intend to use {vendor_name}, your organization must
+    execute a BAA with them before this code ships. Update regkit.yaml once
+    signed: ai_vendors: [{ vendor: "{vendor_name}", baa_signed: true }]
+
+  auto_fix_available: true
+  auto_fix_description: >
+    RegKit can rewrite this call to use the first vendor in your regkit.yaml
+    config marked baa_signed: true, if one exists. Otherwise RegKit inserts
+    a build-time guard that throws an error until baa_signed is set to true,
+    preventing accidental deployment.
+
+evidence_contribution:
+  # What this rule feeds into the auto-generated compliance documents
+  - document: "HIPAA Security Risk Assessment"
+    section: "PHI data flows and vendor risk"
+  - document: "AI System Data Flow Diagram"
+    section: "Third-party data disclosure points"
+
+test_cases:
+  should_trigger:
+    - code: |
+        const response = await openai.chat.completions.create({
+          model: 'gpt-4o',
+          messages: [{ role: 'user', content: patientRecord.diagnosis }]
+        });
+      config: "ai_vendors: [{ vendor: openai, baa_signed: false }]"
+
+  should_not_trigger:
+    - code: |
+        const response = await anthropic.messages.create({
+          model: 'claude-sonnet-4-6',
+          messages: [{ role: 'user', content: patientRecord.diagnosis }]
+        });
+      config: "ai_vendors: [{ vendor: anthropic, baa_signed: true }]"
+
+    - code: |
+        const response = await openai.chat.completions.create({
+          model: 'gpt-4o',
+          messages: [{ role: 'user', content: deidentifiedRecord.summary }]
+        });
+      config: "data_tags: { deidentifiedRecord: deidentified }"
