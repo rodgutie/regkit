@@ -1,0 +1,273 @@
+# RegKit Rule: RK-US-FCRA-ECOA-001
+# Federal FCRA (Regulation V) + ECOA (Regulation B) — adverse action
+# notice content, specificity, and AI-explainability requirements
+#
+# Legal basis: ECOA, 15 U.S.C. § 1691 et seq., as implemented by
+# Regulation B (12 CFR Part 1002, esp. § 1002.9); FCRA, 15 U.S.C. § 1681
+# et seq., as implemented by Regulation V (12 CFR Part 1022, esp. § 615)
+# Status: ACTIVELY ENFORCED, with specific CFPB guidance directly
+# targeting AI/algorithmic underwriting (Circular 2022-03, Circular
+# 2023-03)
+#
+# WHY THIS RULE EXISTS AS A STANDALONE FEDERAL RULE (closing the MVP gap
+# flagged in the master tracker): fintech is RegKit's explicitly stated
+# #1 target vertical. Every other credit/lending-adjacent finding so far
+# (RK-IL-HB3773-001's zip-code branch, RK-CA-ADMT-001's financial-services
+# domain) touches this territory PERIPHERALLY but none of them check
+# whether the actual adverse-action NOTICE CONTENT meets federal
+# specificity requirements — which is the single most commonly violated,
+# most heavily CFPB-scrutinized requirement for AI-driven credit decisions
+# specifically.
+#
+# THE CORE LEGAL PROBLEM THIS RULE TARGETS:
+# The CFPB has stated PLAINLY and REPEATEDLY that using a "black-box" or
+# uninterpretable AI model is NOT a defense to adverse-action specificity
+# requirements. If a model cannot produce specific, accurate principal
+# reasons for a denial, Reg B and Reg V do not permit its use for credit
+# decisions AT ALL — this is a much harder requirement than a generic
+# "be explainable" aspiration; it's a binary gate on whether the model
+# can lawfully be used this way at all.
+
+id: RK-US-FCRA-ECOA-001
+name: "AI credit/consumer-report decision lacks specific, accurate adverse action reasons, or relies on an unexplainable model"
+severity: BLOCK
+  # BLOCK because the CFPB has stated unequivocally that lack of model
+  # interpretability is not a defense — if RegKit cannot find a mechanism
+  # producing specific, accurate principal reasons, the underlying model
+  # use itself is legally vulnerable, not just the notice paperwork.
+
+regulation:
+  framework: "ECOA/Regulation B + FCRA/Regulation V"
+  citation: "12 CFR § 1002.9 (Reg B); 15 U.S.C. § 1681m, 12 CFR Part 1022 § 615 (Reg V/FCRA)"
+  enforcement_authority: "CFPB (primary), prudential banking regulators, state AGs, plus PRIVATE RIGHT OF ACTION under both statutes"
+  cfpb_guidance: >
+    Circular 2022-03: ECOA/Reg B's specific-reasons requirement applies
+    EQUALLY to AI/complex-algorithm decisions — a creditor's own lack of
+    understanding of its model is NOT a defense, and post-hoc explanation
+    methods are only approximations whose accuracy must still be
+    validated. Circular 2023-03: creditors may NOT rely on the CFPB's
+    own model adverse-action forms if those forms' checklist reasons
+    don't specifically and accurately capture the actual principal
+    reasons — generic/vague reasons (e.g. "internal scoring system score
+    too low") do not satisfy the requirement.
+  summary: >
+    When a creditor takes "adverse action" (denial, unfavorable term
+    change, credit-limit-increase refusal, account termination, or
+    failure to make a requested counteroffer) on a credit application or
+    account, Reg B requires written notice with a STATEMENT OF SPECIFIC
+    REASONS — the PRINCIPAL reasons actually relied upon, not generic
+    categories. Reg V/FCRA separately requires disclosure when a
+    consumer report (or third-party/affiliate information) was a basis
+    for the action, including credit-score-specific disclosures (the
+    score itself, up to 4 key adverse factors, or up to 5 if number of
+    inquiries was a key factor). The two notices can be combined but have
+    DIFFERENT triggers and DIFFERENT required content — RegKit checks
+    both independently, not as one merged obligation.
+  timing_requirements: >
+    Reg B: notice within 30 days of receiving a completed application,
+    or within 30 days of taking adverse action on an incomplete
+    application/existing account, or within 90 days of a counteroffer the
+    applicant doesn't accept. FCRA imposes no specific deadline of its
+    own, so combined notices typically follow Reg B's timing.
+
+detection:
+  trigger_conditions_independent_branches:
+
+    - rule_branch: "specific_reasons_requirement"
+      severity: BLOCK
+      description: >
+        AI/ML model output drives a credit-adverse-action decision
+        (denial, term reduction, limit-increase refusal, termination, or
+        unaccepted-counteroffer scenario) and the notice-generation logic
+        produces only a GENERIC or VAGUE reason (e.g. "did not meet
+        internal scoring threshold," "algorithm score too low," "model
+        output: decline") rather than the SPECIFIC factors the model
+        actually weighted for THIS applicant.
+      ast_pattern: >
+        A credit-decision function whose output reaches a notice-
+        generation/templating step where the "reason" field is populated
+        from a STATIC string or a generic category constant, rather than
+        from a dynamic extraction of the actual top contributing features
+        for that specific applicant's specific model run.
+      cfpb_unacceptable_examples_to_pattern_match_against:
+        - "generic reference to a credit score's 'key factors' used as if it satisfies the Reg B reason requirement on its own (CFPB: insufficient on its own)"
+        - "internal-scoring-system threshold failure stated without the underlying reason the applicant failed it"
+        - "more than 4 reasons listed with no clear principal-reasons prioritization (practitioner guidance: pick the top 4, more is not more helpful)"
+
+    - rule_branch: "model_explainability_gate"
+      severity: BLOCK
+      description: >
+        The underlying credit-decision model itself has NO mechanism
+        capable of producing per-applicant feature attribution (e.g. no
+        SHAP/LIME-style explainability layer, no inherently interpretable
+        model architecture, no validated post-hoc explanation pipeline)
+        AND is used for adverse credit decisions. Per CFPB Circular
+        2022-03, this is not merely a notice-drafting problem — using
+        such a model for adverse credit decisions AT ALL is the
+        underlying violation, since the inability to produce specific
+        reasons cannot be cured after the fact by better copywriting.
+      ast_pattern: >
+        A call to an LLM-based or other complex-AI credit-scoring function
+        with NO reachable explainability/attribution function (e.g.
+        regkit.extractFeatureAttribution(), a SHAP/LIME call, or an
+        equivalent) between the model call and the notice-generation step.
+      severity_escalation_note: >
+        This branch is the most consequential finding RegKit can surface
+        in the fintech vertical — flag it prominently and distinctly from
+        the notice-content branch above, since fixing notice copy alone
+        does NOT cure this underlying problem if no attribution mechanism
+        exists to draw specific reasons FROM.
+
+    - rule_branch: "credit_score_disclosure_requirement"
+      severity: WARN
+      description: >
+        Reg V/FCRA-specific: when a consumer report/credit score was used,
+        notice must separately disclose the actual score used, up to 4 key
+        adverse factors (5 if number of inquiries was itself a key
+        factor), the range of possible scores, and the date/source of the
+        score. RegKit checks for a reachable score-disclosure step
+        independent of the Reg B specific-reasons branch above — these
+        are SEPARATE obligations under separate statutes even when
+        combined into one physical notice document.
+      ast_pattern: >
+        Credit-decision function consumes a `creditScore` or
+        `consumerReportData` variable with no corresponding disclosure-
+        field population for score value, score range, score date, and
+        key adverse factors in the notice-generation output.
+      multiple_scores_handling: >
+        If the model uses MULTIPLE credit scores, only the score actually
+        RELIED UPON in the decision must be disclosed — RegKit does not
+        require disclosure of every score the system merely retrieved,
+        only the one(s) the decision logic actually used.
+
+    - rule_branch: "applicant_vs_consumer_scope_check"
+      severity: INFO
+      description: >
+        Reg B applies to "applicants" broadly (individuals AND businesses
+        of all sizes; co-applicants included; guarantors excluded). FCRA
+        applies ONLY to individual consumers, not business transactions.
+        RegKit flags when a business-credit decision triggers ONLY the
+        notice-generation path associated with Reg V/FCRA content
+        requirements (score disclosure, etc.) without also satisfying Reg
+        B's specific-reasons requirement, since FCRA's narrower consumer-
+        only scope means a business applicant could otherwise fall through
+        a gap if the code's notice logic assumes FCRA coverage implies Reg
+        B coverage, or vice versa.
+
+false_positive_guards:
+  - >
+    Does not trigger on the credit-score-disclosure branch when no
+    consumer report/credit score was used in the decision at all — e.g. a
+    pure cash-flow-based underwriting model with no CRA data dependency.
+    Only fires when a credit-score/consumer-report variable is actually
+    present in the decision inputs.
+  - >
+    Does not require disclosure of every score retrieved if multiple
+    scores were pulled but only one was actually used in the decision —
+    only the score(s) RELIED UPON must be disclosed, per CFPB guidance.
+  - >
+    The model_explainability_gate branch does not fire for traditional,
+    inherently interpretable scoring models (e.g. simple weighted linear
+    scorecards) where feature contributions are mechanically obvious from
+    the model structure itself — it specifically targets opaque/complex-
+    AI models (LLMs, deep neural nets, ensemble black-box models) where
+    attribution is NOT inherent to the architecture.
+  - >
+    Reg B's "applicant" definition includes businesses of all sizes; FCRA
+    applies only to individual consumers — RegKit does not assume these
+    scopes are identical and checks both independently per the
+    applicant_vs_consumer_scope_check branch.
+
+message:
+  developer_facing: >
+    This AI-driven credit decision function {findings_summary}. Federal
+    regulators (CFPB Circulars 2022-03 and 2023-03) have stated explicitly
+    that using a model too complex to explain is NOT a defense to the
+    specific-reasons requirement — if your model cannot produce specific,
+    accurate principal reasons for THIS applicant's denial, using it for
+    adverse credit decisions is itself the violation, not merely a notice-
+    drafting problem.
+
+  suggested_fix: >
+    {explainability_missing}: Add a feature-attribution mechanism (SHAP,
+    LIME, or an inherently interpretable model architecture) between the
+    model's decision and the notice-generation step — RegKit cannot
+    retrofit explainability onto an opaque model architecturally; this
+    requires either an architecture change or a validated post-hoc
+    explanation pipeline with accuracy testing.
+    {generic_reasons_detected}: Replace static/generic reason strings with
+    dynamic extraction of the top 2-4 principal factors actually
+    contributing to THIS applicant's specific decision.
+    {score_disclosure_missing}: Add score value, score range, score date,
+    and up to 4 (or 5, if inquiries were a key factor) key adverse factors
+    to the notice when a consumer report/credit score was used.
+
+  auto_fix_available: false
+  auto_fix_unavailable_reason: >
+    Unlike most RegKit rules, this rule has NO auto-fix for the
+    explainability_gate branch — adding genuine model explainability is
+    an architecture decision requiring data science judgment, not a code
+    scaffold RegKit can safely auto-generate. RegKit CAN scaffold the
+    notice-template structure (specific-reasons field, score-disclosure
+    fields) for the other branches, but the underlying data feeding those
+    fields must come from a real attribution mechanism a human builds.
+
+evidence_contribution:
+  - document: "NIST AI RMF Conformance Report"
+    section: "Cross-referenced under MEASURE function — model explainability as a measurable, federally-required control for credit use cases specifically"
+  - document: "AI System Data Flow Diagram"
+    section: "Credit-decision systems flagged with adverse-action notice compliance status"
+
+monitoring_note_for_agent_7: >
+  Watch consumerfinance.gov for: (1) the CFPB's April 2026 final rule
+  amending Regulation B (referenced in passing in recent practitioner
+  commentary as drawing "substantial attention" — AGENT-7 must pull full
+  text and assess impact on this rule once available), (2) any new CFPB
+  circulars specifically addressing generative-AI/LLM-based underwriting,
+  which is a more recent fact pattern than the complex-algorithm guidance
+  this rule currently draws from, (3) CFPB leadership/priority shifts
+  given recent reporting on potential CFPB leadership changes, which could
+  affect enforcement posture even if the underlying regulatory text is
+  unchanged.
+
+test_cases:
+  should_trigger_explainability_gate:
+    - code: |
+        async function evaluateCreditApplication(applicant) {
+          const decision = await llm.complete(underwritingPrompt(applicant));
+          if (decision.includes('decline')) {
+            return sendAdverseActionNotice(applicant, { reason: 'Application declined' });
+          }
+        }
+      reason: "Opaque LLM-based decision with no attribution mechanism and a generic notice reason"
+
+  should_trigger_score_disclosure_branch_only:
+    - code: |
+        async function evaluateCreditApplication(applicant) {
+          const score = await creditBureau.getScore(applicant.ssn);
+          const decision = await interpretableScorecard.evaluate(applicant, score);
+          if (!decision.approved) {
+            return sendAdverseActionNotice(applicant, {
+              reasons: decision.topFactors,  // specific reasons present
+              // but no score/range/date disclosure populated
+            });
+          }
+        }
+      reason: "Specific reasons present (satisfies Reg B branch) but credit score itself, range, and date not disclosed (Reg V/FCRA gap)"
+
+  should_not_trigger:
+    - code: |
+        async function evaluateCreditApplication(applicant) {
+          const score = await creditBureau.getScore(applicant.ssn);
+          const decision = await interpretableScorecard.evaluate(applicant, score);
+          if (!decision.approved) {
+            return sendAdverseActionNotice(applicant, {
+              specificReasons: decision.topFactors.slice(0, 4),
+              creditScore: score.value,
+              scoreRange: score.range,
+              scoreDate: score.pulledDate,
+              keyAdverseFactors: score.topAdverseFactors.slice(0, 4)
+            });
+          }
+        }
+      reason: "Interpretable model, specific principal reasons extracted, full Reg V score disclosure present"
