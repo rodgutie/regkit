@@ -156,6 +156,57 @@ function hasScaffoldCall(text, scaffoldPatterns) {
   return scaffoldPatterns.some(p => text.includes(p));
 }
 
+/** Media-generation SDK call patterns (image/video/audio) for provenance rules */
+const MEDIA_GEN_SDK_PATTERNS = [
+  'imageGenModel.generate', 'videoGenModel.generate', 'audioGenModel.generate',
+  'dalle', 'dall-e', 'stableDiffusion', 'stable_diffusion', 'runway',
+  'elevenlabs', 'voiceSynthesis', 'generateImage', 'generateVideo', 'generateAudio',
+];
+
+/** Basic non-generative image ops that must NOT trigger provenance rules (material-alteration carve-out) */
+const NON_GENERATIVE_IMAGE_OPS = [
+  'resize', 'crop', 'compress', 'colorCorrect', 'brightness', 'rotate', 'denoise', 'upscale',
+];
+
+/** Detects a media-generation call, returns {matched, mediaType, isNonGen} */
+function matchesMediaGenCall(callNode, sourceCode) {
+  const text = nodeText(callNode, sourceCode);
+  const isNonGen = NON_GENERATIVE_IMAGE_OPS.some(op => text.toLowerCase().includes(op.toLowerCase()));
+  for (const pattern of MEDIA_GEN_SDK_PATTERNS) {
+    if (text.toLowerCase().includes(pattern.toLowerCase().split('.')[0])) {
+      let mediaType = 'media';
+      if (/image|dalle|dall-e|diffusion/i.test(text)) mediaType = 'image';
+      else if (/video|runway/i.test(text)) mediaType = 'video';
+      else if (/audio|voice|elevenlabs/i.test(text)) mediaType = 'audio';
+      return { matched: true, mediaType, isNonGen };
+    }
+  }
+  return { matched: false };
+}
+
+/** Chatbot interface signals — function names suggesting a conversational endpoint */
+const CHATBOT_FUNCTION_SIGNALS = /chat|conversation|companion|assistant|message|dialogue|reply/i;
+
+/** Cross-session memory signals (distinguishes companion AI from transactional bots) */
+const COMPANION_MEMORY_SIGNALS = /getConversationHistory|conversationHistory|getMemory|userHistory|persona|relationship/i;
+
+/** Checks if any jurisdiction in config matches a target set (unspecified = conservative include) */
+function jurisdictionApplies(projectConfig, targetStates) {
+  const jurisdictions = projectConfig.jurisdictions ||
+    (projectConfig.project && projectConfig.project.jurisdictions) || [];
+  if (jurisdictions.length === 0) return true;
+  const upper = jurisdictions.map(j => String(j).toUpperCase());
+  if (upper.includes('US') || upper.includes('ALL')) return true;
+  return targetStates.some(s => upper.includes(s.toUpperCase()));
+}
+
+/** Reads a value from project config, tolerating flat or nested-under-project shapes */
+function configValue(projectConfig, key) {
+  if (projectConfig[key] !== undefined) return projectConfig[key];
+  if (projectConfig.project && projectConfig.project[key] !== undefined) return projectConfig.project[key];
+  return undefined;
+}
+
 // ─── EXPORTS ──────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -167,6 +218,12 @@ module.exports = {
   findSensitiveDataSignals,
   findEnclosingFunction,
   hasScaffoldCall,
+  matchesMediaGenCall,
+  jurisdictionApplies,
+  configValue,
   AI_SDK_CALL_PATTERNS,
   SENSITIVE_VARIABLE_PATTERNS,
+  MEDIA_GEN_SDK_PATTERNS,
+  CHATBOT_FUNCTION_SIGNALS,
+  COMPANION_MEMORY_SIGNALS,
 };

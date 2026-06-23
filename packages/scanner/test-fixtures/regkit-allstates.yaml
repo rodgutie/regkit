@@ -1,0 +1,5 @@
+project:
+  name: multi-state-test
+  industry: technology
+  jurisdictions:
+    - US
