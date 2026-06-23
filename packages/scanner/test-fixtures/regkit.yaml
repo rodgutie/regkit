@@ -1,0 +1,11 @@
+project:
+  name: test-healthtech-fintech-app
+  industry: healthcare
+  jurisdictions:
+    - US
+
+ai_vendors:
+  - vendor: openai
+    baa_signed: false
+  - vendor: anthropic
+    baa_signed: true

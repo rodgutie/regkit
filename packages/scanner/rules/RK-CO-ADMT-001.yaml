@@ -1,0 +1,216 @@
+# RegKit Rule: RK-CO-ADMT-001
+# Colorado SB 26-189 — Automated Decision-Making Technology (ADMT)
+#
+# *** THIS RULE REPLACES THE EARLIER COLORADO AI ACT (SB 24-205) FRAMEWORK ***
+#
+# IMPORTANT HISTORY — why this rule looks different from what you might
+# expect if you read RegKit's earlier playbook material:
+#
+# SB 24-205 (the original "Colorado AI Act," signed May 2024) NEVER TOOK
+# EFFECT. Its start date was delayed twice — first to Feb 1 2026, then to
+# June 30 2026 — and before that second date arrived, a federal magistrate
+# judge stayed enforcement (April 27, 2026) after xAI sued on constitutional
+# grounds (First Amendment, Dormant Commerce Clause, due process vagueness,
+# equal protection), with the DOJ intervening on xAI's side. Colorado then
+# repealed SB 24-205 entirely and replaced it with SB 26-189, signed by
+# Governor Polis on May 14, 2026.
+#
+# This is a textbook example of exactly the failure mode AGENT-7 exists to
+# prevent: a rule built in good faith in early 2026 citing "Colorado AI Act
+# high-risk classification" or "algorithmic impact assessment requirement"
+# would be CITING A DEAD LAW by the time a developer reads the violation
+# message. RegKit's rule below reflects SB 26-189, the law actually in
+# force (pending rulemaking) as of this writing.
+#
+# SB 26-189 is meaningfully NARROWER than SB 24-205 was. Gone: high-risk
+# classification, mandatory risk management programs, annual impact
+# assessments, the broad "duty of care." What remains: consumer notice,
+# adverse-outcome explanation, meaningful human review, and developer
+# documentation — a notice-and-transparency framework, not a full AI
+# governance mandate.
+
+id: RK-CO-ADMT-001
+name: "Automated decision-making technology used without required consumer notice, explanation, or human review pathway"
+severity: WARN
+  # Set to WARN, not BLOCK, deliberately. Per the current legal status:
+  # enforcement is contingent on AG rulemaking, which has not formally
+  # begun, and AG Phil Weiser has stated Colorado will not enforce until
+  # that rulemaking concludes. A federal court stay also currently extends
+  # to this successor legislation. BLOCK-level severity would overstate
+  # the present legal exposure. RegKit's AGENT-7 will escalate this to
+  # BLOCK automatically once rulemaking concludes and the stay is resolved.
+
+regulation:
+  framework: "Colorado SB 26-189 (ADMT Act)"
+  citation: "Colo. Rev. Stat., as amended by SB 26-189 (signed May 14, 2026)"
+  effective_date: "January 1, 2027"
+  enforcement_status: >
+    NOT YET ENFORCEABLE as of this rule's last verification. A federal
+    court stay from the SB 24-205 litigation extends to this successor law.
+    The Colorado AG must complete rulemaking on adverse-outcome disclosure
+    format before enforcement begins; that rulemaking had not formally
+    started as of mid-2026. AGENT-7 is monitoring leg.colorado.gov and the
+    AG's office for rulemaking announcements and will update this rule's
+    severity and enforcement_status fields when status changes.
+  summary: >
+    Organizations that use covered ADMT to materially influence consequential
+    decisions about consumers must: (1) provide pre-use notice to consumers
+    that ADMT is being used, (2) explain adverse outcomes within 30 days
+    when requested, (3) offer meaningful human review of the decision, and
+    (4) maintain developer documentation supporting these obligations.
+    Excluded uses: cybersecurity, fraud prevention, spam/robocall filtering,
+    identity verification, anti-money-laundering, and system reliability.
+    Legal services — covered under the old SB 24-205 — is NOT a covered
+    consequential decision domain under SB 26-189.
+  enforcement_authority: >
+    Colorado Attorney General — exclusive authority. Violations are treated
+    as unfair or deceptive trade practices under the Colorado Consumer
+    Protection Act. There is NO private right of action.
+
+detection:
+  trigger_conditions:
+    - description: >
+        AI/ADMT output materially influences a consequential decision about
+        a Colorado-located consumer, in a covered domain, with no detectable
+        consumer notice mechanism, no adverse-outcome explanation pathway,
+        and no human review function reachable in the call graph.
+      covered_consequential_decision_domains:
+        - employment_hiring_or_termination
+        - education_enrollment_or_opportunity
+        - lending_or_financial_services
+        - housing
+        - healthcare_services
+        - insurance
+      explicitly_excluded_domains:
+        # These do NOT trigger this rule even if AI-driven
+        - cybersecurity_threat_detection
+        - fraud_prevention
+        - spam_or_robocall_filtering
+        - identity_verification
+        - anti_money_laundering
+        - system_reliability_monitoring
+        - legal_services  # covered under old SB 24-205, REMOVED under SB 26-189
+
+  jurisdiction_check:
+    - description: "Only applies to decisions affecting Colorado-located consumers"
+      config_required: "regkit.yaml must declare jurisdictions including CO, or consumer location is unknown/unrestricted (conservative default: flag if jurisdiction not explicitly excluded)"
+
+  required_elements_checked:
+    - element: "pre-use consumer notice"
+      ast_pattern: >
+        A notice/disclosure function call (regkit.disclose(), or a
+        documented notice template reference) reachable before the ADMT
+        decision is rendered to the consumer
+    - element: "adverse-outcome explanation pathway"
+      ast_pattern: >
+        A reachable function or endpoint capable of producing an explanation
+        within 30 days of an adverse outcome (e.g. an /explain or /appeals
+        endpoint, or a regkit.adverseOutcomeExplain() call)
+    - element: "meaningful human review"
+      ast_pattern: >
+        Same conservative posture as RK-GDPR-022 — presence of a review
+        function downgrades concern but does not auto-clear; "meaningful"
+        review is an organizational fact RegKit flags for confirmation
+        rather than verifies outright
+
+false_positive_guards:
+  - >
+    Does not trigger for any of the six explicitly excluded use cases above,
+    even if AI/ML driven — fraud prevention and identity verification systems
+    are out of scope by statute, unlike under the old SB 24-205 framework
+    which had a broader "high-risk" sweep.
+  - >
+    Does not trigger for legal services AI — this domain was covered under
+    the repealed SB 24-205 but is NOT a covered domain under SB 26-189.
+    If your regkit.yaml or earlier RegKit scan history flagged a legal
+    services AI system under a prior Colorado rule, that finding should be
+    treated as resolved/inapplicable under current law.
+  - >
+    Does not trigger if the decision does not "materially influence" the
+    outcome — a system that provides one input among many to a human
+    decision-maker who is not bound by its recommendation is a substantially
+    weaker case than a system whose output directly determines the result.
+    AGENT-3 evaluates the degree of reliance, not just presence of AI in
+    the pipeline.
+  - >
+    Severity is WARN, not BLOCK, reflecting the current stayed/pre-rulemaking
+    enforcement posture. This is a deliberate, documented departure from
+    RegKit's usual BLOCK default for statutory requirements, specifically
+    because enforcement is suspended pending litigation and rulemaking.
+
+message:
+  developer_facing: >
+    This {domain} decision uses automated decision-making technology that
+    materially influences the outcome for what appears to be a Colorado
+    consumer, but RegKit found no consumer notice, adverse-outcome
+    explanation pathway, or human review mechanism. Colorado SB 26-189
+    (effective Jan 1, 2027) will require these elements once enforceable.
+    Enforcement is currently stayed pending AG rulemaking — this is a
+    forward-looking compliance gap, not an active violation today.
+
+  suggested_fix: >
+    Add a consumer notice before the ADMT decision renders, an adverse-
+    outcome explanation pathway reachable within 30 days of an adverse
+    decision, and a human review function for contested outcomes. Building
+    these now avoids a compliance scramble when rulemaking concludes and
+    the January 2027 effective date approaches.
+
+  auto_fix_available: true
+  auto_fix_description: >
+    RegKit scaffolds regkit.disclose() for pre-use notice and
+    regkit.adverseOutcomeExplain() stubs. Human review wrapper is the same
+    regkit.humanReviewGate() used elsewhere — RegKit reuses this scaffold
+    across HIPAA, EU AI Act, GDPR, and Colorado rules so one fix often
+    satisfies multiple frameworks simultaneously.
+
+evidence_contribution:
+  - document: "Algorithmic Impact Assessment"
+    section: "State-law consumer notice and review obligations (forward-looking)"
+    note: >
+      Unlike the old SB 24-205 framework which mandated a formal annual
+      impact assessment, SB 26-189 does not require this document by name.
+      RegKit retains this contribution mapping for organizations that
+      voluntarily maintain impact assessments as a cross-jurisdictional
+      best practice (useful for EU AI Act and NIST AI RMF documentation
+      that DOES require this artifact).
+
+monitoring_note_for_agent_7: >
+  This rule requires active monitoring of three things: (1) resolution of
+  the federal court stay and the xAI/DOJ constitutional challenge,
+  (2) Colorado AG rulemaking progress on adverse-outcome disclosure format,
+  (3) any further legislative amendment before the Jan 1 2027 effective
+  date. Check leg.colorado.gov, coag.gov, and federal court dockets
+  (D. Colo.) for this litigation. Update severity from WARN to BLOCK only
+  once enforcement is confirmed active.
+
+test_cases:
+  should_trigger:
+    - code: |
+        async function screenJobApplicant(application) {
+          const score = await mlModel.predict(application.resume);
+          if (score < threshold) {
+            return { status: 'rejected' };
+          }
+          return { status: 'advance' };
+        }
+      domain: "employment_hiring_or_termination"
+      jurisdiction: "CO"
+      reason: "Materially influences hiring outcome, no notice/explanation/review pathway"
+
+  should_not_trigger:
+    - code: |
+        async function detectFraudulentTransaction(transaction) {
+          const riskScore = await mlModel.predict(transaction.features);
+          return riskScore > threshold;
+        }
+      reason: "Fraud prevention is explicitly excluded under SB 26-189"
+
+    - code: |
+        async function reviewContractClause(clauseText) {
+          const analysis = await llm.complete(legalPrompt);
+          return analysis;
+        }
+      reason: >
+        Legal services was covered under repealed SB 24-205 but is NOT
+        a covered domain under current SB 26-189 — this is a case where
+        the correct answer changed when the underlying law changed

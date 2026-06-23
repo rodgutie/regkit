@@ -1,0 +1,278 @@
+# RegKit Rule: RK-IL-BIPA-001
+# Illinois Biometric Information Privacy Act (BIPA) — standalone consent,
+# notice, retention-policy, and disclosure-limitation rule
+#
+# Legal basis: 740 ILCS 14/1 et seq. (enacted 2008; amended by Public Act
+# 103-0769, effective August 2, 2024)
+# Status: ACTIVELY ENFORCED — highest litigation exposure of any law in
+# RegKit's entire rule set. Settlements have exceeded $1.5 billion since
+# 2008; the first jury trial produced a $228 million verdict.
+#
+# WHY THIS GETS ITS OWN STANDALONE RULE NOW (previously only referenced
+# inline inside RK-EUAI-014 and RK-NYC-LL144-001):
+# BIPA is the single highest financial-exposure statute RegKit covers.
+# Per Rosenbach v. Six Flags, a plaintiff does not need to show ANY actual
+# harm — mere technical non-compliance is sufficient to sue. Combined with
+# the PRIVATE RIGHT OF ACTION (unlike TRAIGA, unlike most rules in this
+# set), this means a single missed consent flow can generate real legal
+# exposure the moment the code ships, not just regulatory risk that
+# depends on an agency choosing to investigate.
+#
+# IMPORTANT 2024 AMENDMENT — GET THIS RIGHT, IT CHANGES THE DAMAGES MODEL:
+# Before August 2, 2024, courts (Cothron v. White Castle) held a SEPARATE
+# violation accrued on EVERY SCAN/TRANSMISSION — meaning a fingerprint
+# timeclock used thousands of times created near-unlimited liability
+# exposure. The 2024 amendment (Public Act 103-0769) changed this: 
+# collecting/disclosing "the same biometric identifier from the same
+# person... using the same method of collection" now constitutes A SINGLE
+# violation, not one per scan. This is real, meaningful relief — but it
+# does NOT mean per-violation damages are gone, only that REPEATED scans
+# of the SAME PERSON via the SAME METHOD collapse into one claim. A
+# DIFFERENT collection method, or a DIFFERENT biometric identifier type,
+# from the same person could still be a separate violation. RegKit's
+# severity/remediation messaging should reflect the post-amendment
+# landscape, not the pre-2024 unlimited-per-scan exposure that drove the
+# largest historical settlements.
+
+id: RK-IL-BIPA-001
+name: "Biometric identifier or information collected, used, or disclosed without BIPA-compliant written consent, notice, or retention policy"
+severity: BLOCK
+  # BLOCK is unambiguous here — no proportionality/risk-tiering exists in
+  # this statute the way it does in EU AI Act Art. 14. Any qualifying
+  # biometric collection without the three Section 15 prerequisites is a
+  # violation, full stop, and Rosenbach establishes that no actual harm
+  # need be shown for standing to sue. This is among the most mechanical,
+  # least judgment-dependent BLOCK rules in RegKit's entire set.
+
+regulation:
+  framework: "Illinois BIPA"
+  citation: "740 ILCS 14/15 (core duties); 740 ILCS 14/20 (private right of action, as amended by P.A. 103-0769)"
+  effective_date: "2008 (original); August 2, 2024 (current amendment)"
+  enforcement_mechanism: "PRIVATE RIGHT OF ACTION — individuals/classes sue directly, no agency gatekeeping required"
+  penalty_structure: >
+    $1,000 per violation for negligent violations; $5,000 per violation
+    for intentional or reckless violations; plus reasonable attorneys'
+    fees and costs; plus injunctive relief.
+  post_2024_amendment_damages_model: >
+    Collecting, disclosing, or redisclosing the SAME biometric identifier
+    from the SAME person, via the SAME method of collection, now
+    constitutes A SINGLE violation regardless of how many times it
+    occurs — this is the key 2024 relief. A different identifier type
+    (e.g. fingerprint AND separately face geometry) or a materially
+    different collection method could still generate additional,
+    separate violations.
+  statute_of_limitations: "5 years (Tims v. Black Horse Carriers, 2023)"
+  summary: >
+    A private entity in possession of biometric identifiers or biometric
+    information must, before collection: (1) inform the subject in
+    writing that biometric data is being collected/stored, (2) inform the
+    subject in writing of the specific purpose and length of term for
+    collection, storage, and use, and (3) obtain a written release
+    (electronic signature qualifies post-2024 amendment). The entity must
+    also develop and publish a written retention and destruction policy,
+    must destroy data within 3 years of last interaction or when the
+    collection purpose is satisfied (whichever is first), may never sell
+    or profit from the data, and may not disclose/redisclose absent
+    consent or a narrow statutory exception.
+
+key_definitions:
+  biometric_identifier: >
+    Retina or iris scan, fingerprint, voiceprint, or scan of hand or face
+    geometry. EXPLICITLY EXCLUDED: writing samples, written signatures,
+    photographs, human biological samples for valid scientific testing,
+    demographic data, tattoo descriptions, physical descriptions (height,
+    weight, hair/eye color), and certain organ/tissue/blood materials.
+  private_entity: >
+    Any individual, partnership, corporation, LLC, association, or other
+    group, however organized — EXCLUDES state/local government agencies,
+    Illinois courts/clerks/judges.
+  statutory_exemptions: >
+    Financial institutions subject to GLBA Title V are EXEMPT entirely.
+    Healthcare-context biometric collection has an exemption that is
+    NOT limited to a hospital's own patients (Mosby v. Ingalls Memorial
+    Hospital, 2023) — broader carve-out than many assume.
+
+detection:
+  trigger_conditions:
+    - description: >
+        Code captures, processes, or stores a biometric identifier
+        (fingerprint, face/hand geometry scan, retina/iris scan,
+        voiceprint) with no detectable consent-and-notice flow completed
+        BEFORE the capture occurs.
+      ast_pattern: >
+        A call to a biometric-capture SDK/library (face-recognition,
+        fingerprint-reader, voice-biometric-auth, hand-geometry-scanner,
+        or an internal equivalent) with no reachable consent-verification
+        gate (regkit.verifyConsent() tagged biometric, or an equivalent
+        check against a stored consent record) preceding the capture call
+        in the same execution path.
+      photograph_exclusion_check: >
+        IMPORTANT: a photograph alone is explicitly NOT a biometric
+        identifier under BIPA. A photo-upload feature does NOT trigger
+        this rule UNLESS the code subsequently processes that photograph
+        through facial-geometry extraction/recognition — it is the
+        EXTRACTION of geometric biometric data from the photo, not the
+        photo itself, that triggers BIPA. RegKit must trace whether a
+        facial-recognition/geometry-extraction step exists downstream of
+        a photo upload before flagging — flagging plain photo storage
+        would be a significant, credibility-damaging false positive.
+
+    - description: >
+        Biometric data is disclosed or transmitted to a third party
+        (e.g. a cloud biometric-processing vendor, an analytics platform)
+        with no consent covering that specific disclosure and no
+        statutory exception applicable.
+      ast_pattern: >
+        Biometric data variable flowing into an external API call or
+        third-party SDK with no consent-scope check confirming the
+        subject consented to disclosure to THIS specific recipient, and
+        no exception flag (financial_transaction_completion,
+        legally_required_disclosure, valid_warrant_or_subpoena) set.
+
+    - description: "No public, written retention and destruction policy exists for the project"
+      check: >
+        regkit.yaml field `bipa_retention_policy.public_url` is populated
+        and the destruction schedule is no longer than 3 years from last
+        interaction or satisfaction of collection purpose, whichever is
+        first — same audit-tracking pattern used in RK-NYC-LL144-001 for
+        bias-audit currency.
+
+  exemption_check_before_flagging:
+    - exemption: "financial institution subject to GLBA Title V"
+      config_flag: "entity_type: financial_institution_glba_covered"
+      effect: "BIPA does not apply AT ALL — suppress this rule entirely for this project"
+    - exemption: "healthcare context"
+      config_flag: "industry: healthcare"
+      note: >
+        Exemption is broader than just "the hospital's own patients" per
+        Mosby — but RegKit does not auto-clear on industry tag alone;
+        flags for human confirmation that the SPECIFIC collection falls
+        within the healthcare exemption's actual scope, since the
+        exemption is not unlimited within that industry.
+    - exemption: "government agency / Illinois court context"
+      config_flag: "entity_type: government_agency"
+      effect: "Not a 'private entity' — BIPA does not apply"
+
+false_positive_guards:
+  - >
+    Photographs alone are NOT biometric identifiers. Plain photo upload,
+    storage, or display features must NOT trigger this rule unless a
+    downstream facial-geometry extraction or recognition step is also
+    present. This is the single most important false-positive guard in
+    this rule — getting it wrong would flag enormous amounts of completely
+    ordinary, non-biometric code (profile photos, image galleries, etc.).
+  - >
+    Demographic data, tattoo descriptions, and physical descriptions
+    (height, weight, hair/eye color) are explicitly excluded — do not
+    extend biometric-style consent requirements to ordinary demographic
+    form fields.
+  - >
+    Financial institutions covered by GLBA Title V are completely outside
+    BIPA's scope — RegKit must check this exemption FIRST and suppress the
+    entire rule for confirmed GLBA-covered entities, not just downgrade
+    severity.
+  - >
+    Post-2024 amendment: repeated scans of the SAME person via the SAME
+    method are now ONE violation, not unlimited per-scan violations.
+    RegKit's remediation messaging should not overstate exposure using
+    the pre-amendment unlimited-per-scan model — that model produced the
+    historical mega-settlements but no longer reflects current law for
+    repeat-scan scenarios specifically.
+
+message:
+  developer_facing: >
+    This code {capture_or_disclosure_description} biometric data
+    (specifically: {identifier_type}) with no BIPA-compliant consent flow
+    detected. Illinois BIPA requires written notice of purpose and
+    duration, plus a written release (electronic signature is sufficient
+    post-2024), BEFORE collection — and a published retention/destruction
+    policy. Under Rosenbach v. Six Flags, no actual harm needs to be shown
+    for a private lawsuit — technical non-compliance alone creates
+    standing to sue, with statutory damages of $1,000-$5,000 per violation
+    plus attorneys' fees.
+
+  suggested_fix: >
+    {consent_missing}: Implement a consent-and-notice flow that captures
+    written release (electronic signature acceptable) BEFORE any
+    biometric capture call executes, stating the specific purpose and
+    retention duration.
+    {retention_policy_missing}: Publish a written retention/destruction
+    policy publicly, with destruction occurring within 3 years of last
+    interaction or purpose satisfaction, whichever is first. Record the
+    public URL in regkit.yaml.
+    {disclosure_missing_consent}: Verify the existing consent scope
+    explicitly covers disclosure to this specific third-party recipient,
+    or confirm an applicable statutory exception before this disclosure
+    proceeds.
+
+  auto_fix_available: true
+  auto_fix_description: >
+    RegKit scaffolds a regkit.verifyConsent() gate tagged 'biometric'
+    before any detected capture call, and a regkit.yaml retention-policy
+    tracking field with automatic expiration warnings — same pattern
+    reused from RK-NYC-LL144-001's audit-currency tracking. RegKit cannot
+    draft the actual consent notice LANGUAGE (purpose/duration specifics
+    are business decisions) — it scaffolds the gate, not the legal text.
+
+evidence_contribution:
+  - document: "Algorithmic Impact Assessment"
+    section: "Biometric data inventory, consent status, and retention policy currency"
+  - document: "AI System Data Flow Diagram"
+    section: "Biometric capture and disclosure points flagged distinctly from general PII flows"
+
+monitoring_note_for_agent_7: >
+  Watch ilga.gov for: (1) any further BIPA amendment attempts — multiple
+  prior reform efforts have failed, but pressure continues following the
+  2024 amendment's partial relief, (2) ongoing litigation over whether the
+  Illinois Workers' Compensation Act preempts workplace BIPA claims
+  (unresolved as of available sources — a ruling either way would
+  materially affect employment-context biometric timeclocks specifically),
+  (3) any circuit split or new Illinois Supreme Court guidance on what
+  counts as a "different method of collection" for purposes of the 2024
+  amendment's single-violation rule — this boundary is not yet fully
+  litigated and affects how RegKit should message multi-touchpoint
+  biometric systems (e.g. a fingerprint scanner AND a separate facial
+  recognition camera for the same person).
+
+test_cases:
+  should_trigger:
+    - code: |
+        async function clockIn(employeeId) {
+          const fingerprint = await fingerprintScanner.capture();
+          await db.recordClockIn(employeeId, fingerprint);
+        }
+      reason: "Biometric capture (fingerprint) with no consent gate before the scanner call"
+
+  should_not_trigger:
+    - code: |
+        async function uploadProfilePhoto(userId, photoFile) {
+          await s3.upload(photoFile, `profiles/${userId}`);
+          return { success: true };
+        }
+      reason: >
+        Plain photograph storage — NOT a biometric identifier under BIPA
+        absent downstream facial-geometry extraction. Must not trigger.
+
+    - code: |
+        async function clockIn(employeeId) {
+          const consentValid = await regkit.verifyConsent({
+            subjectId: employeeId,
+            type: 'biometric',
+            method: 'fingerprint_scan'
+          });
+          if (!consentValid) {
+            throw new Error('Biometric consent required before clock-in');
+          }
+          const fingerprint = await fingerprintScanner.capture();
+          await db.recordClockIn(employeeId, fingerprint);
+        }
+      config: "bipa_retention_policy.public_url: https://company.com/biometric-policy"
+      reason: "Consent gate present before capture, retention policy published and current"
+
+    - code: |
+        async function verifyIdentity(customerId) {
+          const fingerprint = await fingerprintScanner.capture();
+          return await idVerify(fingerprint);
+        }
+      config: "entity_type: financial_institution_glba_covered"
+      reason: "GLBA-covered financial institution — BIPA does not apply at all, exemption suppresses the rule entirely"

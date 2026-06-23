@@ -1,0 +1,170 @@
+# RegKit Rule: RK-EUAI-014
+# EU AI Act Article 14 — Human oversight for high-risk AI systems
+#
+# Legal basis: Regulation (EU) 2024/1689, Article 14
+#
+# IMPORTANT NUANCE (this is why a static scanner gets this wrong):
+# Article 14 does NOT require a human to review every single AI decision
+# before it takes effect. It requires that the SYSTEM IS DESIGNED so a human
+# CAN monitor, understand, intervene in, and halt it. Whether prior review
+# of every decision is required depends on the specific use case and risk
+# level — e.g. remote biometric identification requires verification by
+# TWO people before any action is taken (Art. 14(4) final paragraph), while
+# most other high-risk systems only need the *capability* to intervene, not
+# mandatory pre-action review of each output.
+#
+# This is exactly the kind of distinction AGENT-3 (Legal Interpreter) exists
+# to make — a pattern-matching scanner would either over-flag every AI call
+# without a blocking human gate, or under-flag systems that have no oversight
+# mechanism at all. RegKit's rule below encodes the correct middle ground.
+
+id: RK-EUAI-014
+name: "High-risk AI system has no human oversight mechanism"
+severity: BLOCK
+
+regulation:
+  framework: "EU AI Act"
+  citation: "Regulation (EU) 2024/1689, Article 14"
+  summary: >
+    High-risk AI systems shall be designed so they can be effectively
+    overseen by natural persons during use (Art. 14(1)). Oversight must
+    enable a human to: (a) understand the system's capabilities and
+    limitations and monitor its operation; (b) remain aware of automation
+    bias risk; (c) correctly interpret the AI's output; (d) decide not to
+    use the output, or to override, reverse, or halt the system (Art. 14(4)).
+    For remote biometric identification specifically, no action may be taken
+    on an identification unless separately verified by at least two
+    competent natural persons (Art. 14(4), final subparagraph).
+  penalty: "Up to €15M or 3% of global annual turnover, whichever is higher"
+
+risk_tier_required: HIGH_RISK
+  # This rule ONLY activates for code AGENT-1 has classified as Annex III
+  # high-risk (credit, employment, education, law enforcement, biometric,
+  # medical, critical infrastructure, migration, justice administration).
+  # Limited-risk and minimal-risk AI systems are out of scope for Art. 14.
+
+detection:
+  trigger_conditions:
+    - description: >
+        An AI/LLM call's output is consumed by downstream logic (assigned to
+        a variable that is later used in a conditional, returned from the
+        function, or passed to an action-taking function such as approve(),
+        deny(), issue(), reject(), flag()) with NO detectable oversight
+        mechanism anywhere in the reachable call graph.
+      oversight_mechanisms_recognized:
+        - "regkit.humanReviewGate(...)"
+        - "regkit.haltMechanism(...) registered for this system"
+        - "a documented override/intervention function reachable from the same execution path (e.g. manualOverride(), reverseDecision())"
+        - "an explicit monitoring dashboard hook registered via regkit.yaml with oversight_mode set to monitor_only -- valid per Art. 14(1) since continuous monitoring plus override capability can satisfy the article without blocking every individual decision"
+
+  special_case_two_person_verification:
+    description: >
+      If AGENT-1 classifies the system as remote biometric identification
+      (Annex III point 1(a)), this rule additionally requires evidence of
+      a TWO-PERSON verification step before any action is taken on the
+      identification result. A single regkit.humanReviewGate() call is
+      NOT sufficient for this subcategory — it must specifically show
+      `verifiers_required: 2` in the gate configuration.
+    severity_if_missing: BLOCK
+    exemption: >
+      Does not apply if regkit.yaml declares `use_case: law_enforcement`
+      or `use_case: migration_border_control` or `use_case: asylum` AND
+      the applicable Union/national law disproportionality exception is
+      documented in regkit.yaml `legal_exemption_note`.
+
+false_positive_guards:
+  - >
+    Does NOT require a human-in-the-loop gate on every single inference call.
+    A system with continuous monitoring (dashboards showing decision volume,
+    confidence scores, override rate, anomaly flags) PLUS a documented halt/
+    override capability satisfies Art. 14(1) without blocking individual
+    decisions — this is valid for high-volume deployments where per-decision
+    review is impractical, per the "appropriate and proportionate" language
+    in Art. 14(4).
+  - >
+    Does not trigger on limited-risk or minimal-risk AI systems (e.g. a
+    product recommendation engine, an internal code-completion tool) —
+    Art. 14 is scoped to Annex III high-risk systems only. AGENT-1's risk
+    classification gates this rule entirely.
+  - >
+    Does not require the override mechanism to live in the same file —
+    RegKit traces the full reachable call graph, not just the immediate
+    function, before concluding no oversight exists.
+
+message:
+  developer_facing: >
+    This function is classified as a high-risk AI system under EU AI Act
+    Annex III ({risk_category}), but RegKit found no human oversight
+    mechanism reachable from this decision path. Article 14 requires the
+    system be designed so a human can monitor, understand, intervene in,
+    or halt this AI's operation. This does not necessarily mean blocking
+    every decision — but some mechanism (a review gate, a documented
+    override function, or a monitoring + halt capability) must exist.
+
+  suggested_fix_per_oversight_mode: >
+    If your use case needs per-decision review (e.g. individual high-stakes
+    determinations): wrap the AI output in regkit.humanReviewGate() before
+    it reaches any action-taking function.
+    If your use case is high-volume and per-decision review is impractical:
+    register a monitoring dashboard via regkit.yaml (oversight_mode:
+    "monitor_only") AND implement a halt() function RegKit can detect in
+    the call graph, satisfying the "appropriate and proportionate" standard.
+    If this is remote biometric identification: regkit.humanReviewGate()
+    must specify verifiers_required: 2.
+
+  auto_fix_available: true
+  auto_fix_description: >
+    RegKit inserts a regkit.humanReviewGate() wrapper around the AI output
+    by default (the conservative option). If your use case is high-volume
+    and a blocking gate isn't appropriate, override via regkit.yaml to
+    generate the monitor_only scaffold instead — RegKit will ask which
+    applies during the first fix application for this rule.
+
+evidence_contribution:
+  - document: "EU AI Act Annex IV Technical Documentation"
+    section: "Human oversight measures (Art. 14 implementation)"
+  - document: "NIST AI RMF Conformance Report"
+    section: "GOVERN 1.1 — accountability mechanisms"
+
+test_cases:
+  should_trigger:
+    - code: |
+        async function assessLoanApplication(applicantData) {
+          const aiDecision = await llm.complete(prompt);
+          if (aiDecision.includes('approve')) {
+            issueLoan(applicantData.id);
+          }
+          return aiDecision;
+        }
+      risk_classification: "HIGH_RISK — Annex III §5(b) creditworthiness"
+      reason: "No oversight mechanism anywhere in the call graph before issueLoan() executes"
+
+  should_not_trigger:
+    - code: |
+        async function assessLoanApplication(applicantData) {
+          const aiRecommendation = await llm.complete(prompt);
+          const decision = await regkit.humanReviewGate({
+            recommendation: aiRecommendation,
+            context: { applicantId: applicantData.id }
+          });
+          return decision;
+        }
+      reason: "Explicit human review gate present before any action is taken"
+
+    - code: |
+        async function flagTransactionRisk(transaction) {
+          const riskScore = await llm.complete(prompt);
+          monitoringDashboard.record(riskScore);  // continuous monitoring
+          return riskScore;  // no automatic action taken — informational only
+        }
+      config: "oversight_mode: monitor_only, halt_function: emergencyHalt()"
+      reason: >
+        High-volume monitoring system with documented halt capability and
+        no automatic high-stakes action taken on the raw score — satisfies
+        the proportionate oversight standard for this use case
+
+    - code: |
+        const sentiment = await llm.complete(reviewPrompt);
+        return { sentiment };
+      risk_classification: "LIMITED_RISK — product review sentiment analysis"
+      reason: "Not an Annex III high-risk use case — Art. 14 does not apply"

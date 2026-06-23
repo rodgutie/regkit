@@ -1,0 +1,271 @@
+# RegKit Rule: RK-CA-SB942-001
+# California AI Transparency Act (SB 942, as amended by AB 853) —
+# manifest and latent disclosure requirements for GenAI-generated media
+#
+# Legal basis: Cal. Bus. & Prof. Code §§ 22757 et seq. (added by SB 942,
+# Ch. 291, Statutes of 2024; amended by AB 853, Ch. 674, Statutes of 2025)
+# Effective: August 2, 2026 (delayed from original Jan 1, 2026 via AB 853,
+# deliberately timed to align with EU AI Act Article 50)
+#
+# *** FIRST RULE IN THIS SET THAT IS NOT ABOUT DECISION-MAKING ***
+# Every rule built so far (HIPAA, EU AI Act Art. 14, GDPR Art. 22, Colorado,
+# Texas, NYC, Illinois, California ADMT) concerns AI making or influencing
+# a DECISION about a person. This rule concerns AI GENERATING MEDIA — a
+# completely different code surface (image/video/audio generation calls,
+# not classification/scoring calls) requiring different AST detection
+# entirely. Most of RegKit's existing rule_branch patterns (decision output
+# → action function) do not apply here; the relevant pattern is
+# generation_call → output_artifact with no embedded provenance metadata.
+#
+# CRITICAL ASYMMETRY TO GET RIGHT: latent disclosure is MANDATORY BY
+# DEFAULT. Manifest disclosure is OPTIONAL — the provider must merely
+# OFFER the user the ability to add one; the user can decline a visible
+# label, but the provider cannot omit the hidden one. A rule that treats
+# both as equally mandatory, or both as equally optional, is wrong in
+# opposite directions.
+
+id: RK-CA-SB942-001
+name: "GenAI-generated image/video/audio content missing mandatory latent disclosure, or no manifest disclosure option offered, or no public detection tool available"
+severity: BLOCK
+  # BLOCK is appropriate for the latent disclosure and detection tool
+  # branches (both unconditionally mandatory under the statute, no human-
+  # judgment caveat needed). The manifest disclosure branch is WARN-level
+  # within this same rule because it is an OFFER obligation, not an
+  # OUTCOME obligation — see severity_by_branch below.
+
+regulation:
+  framework: "California AI Transparency Act (SB 942 / AB 853, 'CAITA')"
+  citation: "Cal. Bus. & Prof. Code §§ 22757-22757.4"
+  effective_date: "August 2, 2026"
+  enforcement_authority: "California Attorney General, city attorneys, county counsels — civil enforcement"
+  penalty_structure: "$5,000 per violation, PER DAY — a 30-day failure to maintain a compliant detection tool alone can generate $150,000 in liability"
+  applies_to: >
+    "Covered provider" — a person/entity that creates, codes, or otherwise
+    produces a GenAI system with over 1,000,000 monthly visitors/users,
+    publicly accessible within California. The threshold applies to the
+    GenAI SYSTEM ITSELF, not the parent company's overall user base —
+    a large company's small/niche GenAI feature could fall BELOW
+    threshold even if the company overall has many more users elsewhere.
+  scope_by_content_type: >
+    Applies ONLY to image, video, or audio content, or any combination —
+    explicitly does NOT apply to text-only generative output. This is a
+    deliberate policy choice reflecting higher deception risk in realistic
+    synthetic media versus plain text.
+  explicit_exclusions: >
+    Does not apply to products/services/apps that exclusively provide
+    non-user-generated video games, television, streaming, movies, or
+    interactive experiences.
+
+detection:
+  trigger_conditions_independent_branches:
+
+    - rule_branch: "mandatory_latent_disclosure"
+      severity: BLOCK
+      mandatory_by_default: true
+      description: >
+        Any call to an image/video/audio generation or alteration model
+        (covered provider's own GenAI system) produces output with no
+        detectable embedded machine-readable provenance metadata. This is
+        NOT an opt-in feature for the provider to offer the end user — the
+        provider must embed it by default, automatically, on every
+        qualifying generation/alteration call.
+      ast_pattern: >
+        A call to an image-gen/video-gen/audio-gen/voice-synthesis SDK or
+        internal model (e.g. dall-e, stable-diffusion, runway, elevenlabs,
+        or an internal equivalent) whose return value is written to an
+        output artifact (file write, API response, CDN upload) with no
+        accompanying call to a provenance-embedding function
+        (regkit.embedProvenance() or a recognized C2PA library call)
+        in the same code path.
+      required_content_of_disclosure: >
+        To the extent technically feasible and reasonable: name of the
+        covered provider, name of the GenAI system, version, time/date of
+        creation or alteration, and a unique identifier — conveyed directly
+        in the metadata or via a link to a permanent website.
+      technical_standard_expected: >
+        Industry guidance and provider practice (OpenAI's C2PA-based
+        approach for DALL-E/Sora) point to C2PA (Coalition for Content
+        Provenance and Authenticity) as the de facto compliance standard,
+        though the statute itself does not mandate a specific technical
+        implementation — RegKit checks for ANY recognized provenance
+        mechanism, not C2PA specifically, since the law is outcome-based.
+      durability_requirement: >
+        Disclosure must survive common content transformations —
+        compression, format conversion, cropping, screenshot capture —
+        to the extent technically feasible. RegKit cannot verify
+        durability through static code analysis alone; it verifies that a
+        provenance-embedding step EXISTS in the pipeline, and flags
+        durability testing as a required manual verification step,
+        similar to how RK-NYC-LL144-001 cannot verify bias-audit
+        statistical adequacy from code alone.
+
+    - rule_branch: "manifest_disclosure_option"
+      severity: WARN
+      mandatory_by_default: false
+      description: >
+        Distinct from latent disclosure — this branch is about whether the
+        END USER is given the OPTION to add a visible, human-readable label
+        ("This image was generated by AI"). The provider is not required to
+        force a visible label onto every output, but IS required to make
+        the option available and functional.
+      ast_pattern: >
+        Generation pipeline with no reachable UI/API parameter allowing
+        the calling user to request a visible label be added to output,
+        OR a parameter exists but no corresponding rendering logic
+        actually applies a visible label when requested (a "checkbox that
+        does nothing," same false-positive class as the CCPA ADMT opt-out
+        check in RK-CA-ADMT-001).
+      content_requirements_if_implemented: >
+        Identifies content as AI-generated; clear, conspicuous, appropriate
+        for the medium, understandable to a reasonable person; permanent
+        or extraordinarily difficult to remove once applied.
+
+    - rule_branch: "public_detection_tool"
+      severity: BLOCK
+      description: >
+        Covered provider has no free, publicly accessible tool (web
+        interface and/or API) allowing any user to check whether given
+        content was created/altered by THIS provider's GenAI system. This
+        is a standalone obligation independent of any specific generation
+        call — RegKit checks for the EXISTENCE of this tool at the project/
+        product level (via regkit.yaml `sb942_detection_tool_url`), not at
+        the level of an individual generation function.
+      if_missing: >
+        BLOCK — single highest-leverage finding in this rule, since this
+        is a continuous obligation (a missing detection tool is a
+        violation every day it's missing, at $5,000/day) rather than a
+        per-generation-call issue.
+
+    - rule_branch: "licensee_passthrough_obligation"
+      severity: WARN
+      description: >
+        If this codebase LICENSES a GenAI system to a third party (i.e.
+        this project IS the covered provider, and other code consumes it
+        as a dependency/API), RegKit checks whether license/contract
+        terms (declared in regkit.yaml `sb942_licensee_contracts`) require
+        the licensee to maintain latent-disclosure capability, and whether
+        a 96-hour revocation monitoring process exists.
+      narrow_applicability: >
+        This branch only fires for codebases that ARE a covered provider
+        licensing out their GenAI system — not for ordinary downstream
+        consumers of a third-party GenAI API (e.g. a typical RegKit
+        customer calling OpenAI's API is a LICENSEE, not a provider, and
+        this specific branch does not apply to them — though they should
+        verify their upstream provider's compliance, which is a vendor
+        due-diligence matter, not a code-level finding RegKit can make
+        about the customer's own code).
+
+false_positive_guards:
+  - >
+    Does not apply to text-only generation — an LLM chat completion with no
+    image/video/audio output is entirely out of scope for this rule. Do not
+    flag standard LLM chatbot/text-generation code under RK-CA-SB942-001.
+  - >
+    Does not require every generated image/video/audio to carry a VISIBLE
+    label — only that the OPTION to add one is functionally available.
+    Conversely, does treat the hidden/latent disclosure as mandatory by
+    default with no opt-out for the provider. Getting this asymmetry
+    backwards (treating manifest as mandatory, latent as optional) would
+    be a serious rule defect — double-check this distinction specifically
+    when reviewing or modifying this rule.
+  - >
+    Does not apply below the 1,000,000 monthly user threshold for the
+    SPECIFIC GenAI system/feature, even if the parent company is much
+    larger overall — check the feature-level usage metric declared in
+    regkit.yaml, not company-wide traffic.
+  - >
+    Does not apply to non-user-generated video game, TV, streaming, movie,
+    or interactive experience content per the explicit statutory exclusion.
+  - >
+    The licensee passthrough branch only fires for codebases that ARE the
+    covered provider — does not fire for ordinary API consumers of a
+    third-party GenAI service.
+
+message:
+  developer_facing: >
+    This code generates {media_type} content via a GenAI system that
+    appears to exceed SB 942's covered-provider threshold. RegKit found:
+    {findings_summary}. Latent (embedded, machine-readable) disclosure is
+    MANDATORY by default on every qualifying generation — there is no
+    user opt-out for this one. A manifest (visible) disclosure OPTION must
+    be offered to users, though users may decline to add a visible label.
+    Penalties reach $5,000 per violation per day.
+
+  suggested_fix: >
+    {latent_missing}: Embed provenance metadata (provider name, system
+    name, version, timestamp, unique identifier) into every generated
+    image/video/audio output by default — consider C2PA-compatible
+    embedding, the de facto industry standard, though any durable
+    technical mechanism satisfies the outcome-based statute.
+    {manifest_missing}: Add a user-facing option to apply a visible
+    "AI-generated" label to output content, and confirm the option
+    actually renders a label when selected.
+    {detection_tool_missing}: Stand up a free, public web tool and/or API
+    that lets anyone check whether given content came from your GenAI
+    system — this is a standing daily obligation, prioritize it first.
+
+  auto_fix_available: true
+  auto_fix_description: >
+    RegKit scaffolds a regkit.embedProvenance() call for the latent
+    disclosure branch (developer must wire in actual C2PA or equivalent
+    library — RegKit cannot embed real cryptographic provenance without a
+    specific library integration decision) and a manifest-disclosure UI
+    parameter stub. RegKit cannot stand up the public detection tool
+    itself — that is a separate user-facing product surface, not a
+    generation-pipeline code fix.
+
+evidence_contribution:
+  - document: "AI System Data Flow Diagram"
+    section: "GenAI media generation endpoints flagged with SB 942 disclosure status"
+  - document: "NIST AI RMF Conformance Report"
+    section: "Cross-referenced under MEASURE function — provenance/detection tooling as a measurable control"
+
+monitoring_note_for_agent_7: >
+  Watch for: (1) any CPPA/AG guidance clarifying acceptable technical
+  standards for latent disclosure (the statute is outcome-based and does
+  not mandate C2PA specifically — watch for enforcement actions that might
+  effectively establish a de facto technical floor), (2) the January 1,
+  2027 "large online platforms" detection-and-disclosure obligation taking
+  effect (extends SB 942's reach from creators to distributors — relevant
+  if RegKit's customer operates a platform that hosts third-party-generated
+  content, a DIFFERENT obligation from the generation-side rule above),
+  (3) January 1, 2028 capture-device-manufacturer obligations (almost
+  certainly out of scope for RegKit's software-only customer base, but
+  confirm if any customer also manufactures hardware).
+
+test_cases:
+  should_trigger_latent_branch:
+    - code: |
+        async function generateProductImage(prompt) {
+          const image = await imageGenModel.generate(prompt);
+          await s3.upload(image, outputPath);
+          return outputPath;
+        }
+      config: "monthly_users: 2500000"
+      reason: "Image generation with no provenance embedding before upload — latent disclosure missing"
+
+  should_trigger_detection_tool_branch:
+    - code: "// any project-level scan, regardless of specific generation function"
+      config: "no sb942_detection_tool_url in regkit.yaml"
+      reason: "Standing obligation independent of any single function — missing entirely"
+
+  should_not_trigger:
+    - code: |
+        async function generateProductImage(prompt, addVisibleLabel) {
+          const image = await imageGenModel.generate(prompt);
+          const provenanceEmbedded = await regkit.embedProvenance(image, {
+            provider: 'AcmeCorp', system: 'AcmeGen-v3', timestamp: Date.now()
+          });
+          const finalImage = addVisibleLabel
+            ? applyVisibleAILabel(provenanceEmbedded)
+            : provenanceEmbedded;
+          await s3.upload(finalImage, outputPath);
+          return outputPath;
+        }
+      config: "sb942_detection_tool_url: https://acmecorp.com/ai-detector"
+      reason: "Latent disclosure embedded by default, manifest option genuinely functional, detection tool exists"
+
+    - code: |
+        const response = await llm.complete(textPrompt);
+        return response;
+      reason: "Text-only output — SB 942 does not apply to text"

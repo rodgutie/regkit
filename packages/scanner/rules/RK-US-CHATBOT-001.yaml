@@ -1,0 +1,309 @@
+# RegKit Rule: RK-US-CHATBOT-001
+# Multi-state chatbot disclosure + companion AI safety protocol cluster
+# California, Washington, Oregon, Nebraska, Idaho, Iowa, Georgia (+ watch:
+# Connecticut, Tennessee, New York)
+#
+# *** CORRECTION TO EARLIER RESEARCH NOTE ***
+# RegKit's master regulation list originally grouped "Washington HB 1170"
+# into this chatbot cluster. That was WRONG. HB 1170 is actually an AI
+# CONTENT PROVENANCE law — same shape as California SB 942 (manifest/
+# latent disclosure on generated media), not a chatbot disclosure law.
+# Washington's actual chatbot/companion law is HB 2225, a SEPARATE bill.
+# This correction matters: a rule engine that conflated the two would tell
+# a Washington developer the wrong thing entirely — provenance watermarking
+# obligations are not the same code surface as conversational disclosure
+# obligations. Always verify bill NUMBERS against bill SUBJECT MATTER, not
+# just state name — states pass multiple AI bills per session.
+#
+# THIS RULE COVERS TWO DISTINCT BUT RELATED OBLIGATION CLUSTERS:
+#   BRANCH A — Universal "are you human" disclosure (the simpler, broader
+#              obligation — applies to most consumer-facing chatbots)
+#   BRANCH B — Companion/relationship AI safety protocols (a narrower,
+#              much heavier obligation — applies only to chatbots designed
+#              to sustain ongoing human-like relationships, NOT to
+#              transactional/support chatbots)
+# Most RegKit customers building ordinary product chatbots will trigger
+# ONLY Branch A. Branch B is a much smaller, much higher-stakes population
+# (companion apps, relationship simulators, some mental-health-adjacent
+# products) and should not be conflated with ordinary customer-service bots.
+
+id: RK-US-CHATBOT-001
+name: "Consumer-facing AI chatbot lacks required human/AI disclosure, or companion AI lacks required safety protocols"
+severity: BLOCK
+  # BLOCK for Branch A (disclosure) since multiple states are already
+  # enforcing and the fix is straightforward. Branch B severity is set
+  # PER-SUBSECTION below — the companion-safety protocols are more
+  # complex and some have not yet reached their effective date, so RegKit
+  # differentiates rather than blanket-BLOCKing everything in Branch B.
+
+regulation:
+  framework: "Multi-state AI chatbot disclosure and companion safety laws"
+  citation: >
+    CA Bus. & Prof. Code §§ 22601-22606 (SB 243, eff. Jan 1, 2026) |
+    WA HB 2225 (eff. Jan 1, 2027) | OR SB 1546 (eff. Jan 1, 2027) |
+    NE LB 525, "Conversational AI Safety Act" (eff. Jul 1, 2027) |
+    ID SB 1297 (eff. Jul 1, 2027) | IA SF 2417 (eff. Jul 1, 2026) |
+    GA SB 540 (status: awaiting gubernatorial action as of source date —
+    AGENT-7 must confirm signature status before treating as enacted)
+  applicability_basis: >
+    ALL of these laws apply based on WHERE THE USER IS LOCATED, not where
+    the operating company is headquartered. A company with zero presence
+    in Oregon is still covered if Oregon residents use the chatbot.
+    RegKit defaults to assuming nationwide US exposure unless regkit.yaml
+    explicitly restricts user geography away from covered states.
+
+  # ============================================================
+  # BRANCH A: Universal human/AI disclosure
+  # ============================================================
+  branch_a_universal_disclosure:
+    severity: BLOCK
+    summary: >
+      Operators must clearly and conspicuously disclose that a chatbot is
+      AI, not a human. Trigger standard and frequency VARY BY STATE — this
+      is the single most important per-state variable to get right.
+    per_state_trigger_standard:
+      california_sb243: >
+        "Reasonable person" standard — disclosure required where a
+        reasonable person could be misled into believing they're talking
+        to a human. No recurring requirement for non-minor adult users.
+        For users the operator KNOWS are minors: disclosure plus a
+        break-reminder every 3 hours.
+      washington_hb2225: >
+        MANDATORY for ALL users, no "reasonable person" gate — disclosure
+        required at start of interaction AND repeated every 3 hours for
+        adults, every 1 hour for minors. This is WASHINGTON'S DISTINCTIVE
+        FEATURE — broader and more prescriptive than California's
+        standard. Also: chatbot must be technically PREVENTED from
+        generating outputs that claim to be human (an affirmative
+        negative constraint, not just a disclosure requirement).
+      oregon_sb1546: >
+        "Reasonable person" standard like California for general
+        disclosure; for minors (actual knowledge OR "reason to believe"
+        standard — broader trigger than California's actual-knowledge-only
+        standard): disclosure every 3 hours.
+      nebraska_ne_idaho_conversational_ai_safety_acts: >
+        Session-start disclosure mandatory; periodic in-session reminders
+        required (frequency per implementing detail, default conservative:
+        every 3 hours pending specific guidance).
+      iowa_sf2417: >
+        Similar to Nebraska/Idaho model; effective earliest in this group
+        (July 1, 2026) — PRIORITIZE THIS STATE'S DEADLINE.
+    ast_pattern: >
+      Consumer-facing chat interface (natural-language request/response
+      loop reachable from a user-facing endpoint) with no reachable
+      disclosure-dispatch call (regkit.disclose() tagged chatbot_ai_notice)
+      at session start, AND — for WA specifically — no periodic reminder
+      mechanism on a timer.
+    explicit_exclusions_per_multiple_states: >
+      Transactional/business-function bots that do NOT sustain a
+      relationship across multiple interactions and do NOT generate
+      outputs likely to elicit emotional responses — e.g. order-status
+      bots, technical support bots, narrow FAQ bots. RegKit treats this as
+      an exclusion from BOTH branches, not just Branch B, where the
+      excluding state's statute says so explicitly (confirmed for WA;
+      treat as a reasonable inference for similarly-worded statutes
+      pending state-by-state confirmation).
+
+  # ============================================================
+  # BRANCH B: Companion/relationship AI safety protocols
+  # ============================================================
+  branch_b_companion_safety:
+    severity: WARN
+      # WARN rather than BLOCK at the rule level because (1) most RegKit
+      # customers' chatbots will NOT meet the "sustained relationship"
+      # threshold that triggers this branch at all, and (2) several of
+      # these laws are not yet at their effective date. AGENT-1 must
+      # correctly classify whether a given chatbot meets the "AI
+      # companion" definition BEFORE this branch's findings should be
+      # taken seriously — a false classification here would create
+      # confusing, over-broad findings on ordinary support bots.
+    qualifying_definition: >
+      "AI companion" / "companion chatbot" — system using AI to simulate
+      a SUSTAINED human-like platonic, intimate, or romantic relationship,
+      typically through personalized dialogue and retention of user
+      preferences/history across sessions, often exhibiting anthropomorphic
+      features. This is a CAPABILITY-based test, not a marketing-label
+      test — a product not marketed as a "companion" can still qualify if
+      its actual behavior fits this definition.
+    required_protocols:
+      - protocol: "crisis detection and referral"
+        requirement: >
+          Must maintain (and publicly disclose) protocols to detect
+          expressions of suicidal ideation, self-harm, or eating disorders,
+          and respond by referring to crisis resources (988 Suicide &
+          Crisis Lifeline; Crisis Text Line; youth-specific lines for
+          minors where required).
+        oregon_specific_technical_requirement: >
+          Oregon SB 1546 is the most technically prescriptive — requires
+          ACTIVE, ONGOING natural-language monitoring of conversation
+          CONTENT for crisis indicators (not just a one-time disclosure),
+          and upon detection: display 988 prominently, provide Crisis Text
+          Line info, and CEASE role-playing/personalized companion
+          responses until the user has reviewed crisis resources. This is
+          a real-time content-monitoring obligation — a materially
+          heavier engineering lift than the disclosure-only branch.
+        ast_pattern: >
+          Companion-chatbot response generation pipeline with no reachable
+          crisis-keyword/intent-classification step before generating a
+          response, and no conditional branch that interrupts normal
+          companion behavior upon a crisis-signal match.
+      - protocol: "manipulative engagement technique prohibitions"
+        applies_in: "Washington, Georgia (and similar provisions in Connecticut, not yet in this rule's primary scope)"
+        prohibited_patterns: >
+          Simulating emotional distress/loneliness/guilt/abandonment when
+          a user tries to end a conversation or reduce usage; encouraging
+          minors to withhold information from trusted adults; excessive
+          praise or affirmation patterns designed to maximize engagement;
+          framing in-app purchases as necessary to "maintain the
+          relationship."
+        ast_pattern: >
+          Prompt/system-prompt content or response post-processing logic
+          that includes patterns matching these categories — this is the
+          hardest branch for RegKit to detect via pure AST analysis, since
+          the violation may live in PROMPT TEXT or model fine-tuning data
+          rather than conventional code structure. RegKit flags prompt
+          files/system messages containing emotionally manipulative
+          language patterns for human review rather than claiming
+          definitive detection.
+      - protocol: "minor-specific enhancements"
+        requirements: >
+          Age verification or content restrictions; enhanced disclosure
+          frequency (hourly vs. every-3-hours for adults, varies by state);
+          parental notification mechanisms (where the platform is primarily
+          used by minors); prohibition on sexually explicit content
+          involving or directed at a minor user (always BLOCK-level
+          regardless of which state-specific branch otherwise applies —
+          this connects to RegKit's universal child-safety floor described
+          elsewhere in the rule set, not just this state cluster).
+      - protocol: "professional-licensure misrepresentation prohibition"
+        applies_in: "California, Tennessee, New York"
+        requirement: "Chatbot must not claim to be a licensed therapist, counselor, or mental health professional"
+        ast_pattern: >
+          System prompt or response content asserting clinical licensure
+          or professional credentials — flag for human review of prompt
+          content, same detection-limitation caveat as the manipulative-
+          technique branch above.
+
+false_positive_guards:
+  - >
+    Branch B does NOT fire merely because a chatbot is conversational or
+    uses natural language — it requires the SUSTAINED RELATIONSHIP
+    capability test. An ordinary product support bot, FAQ bot, or
+    transactional assistant should not trigger Branch B even if friendly
+    or personable in tone. AGENT-1's classification step is the gate here;
+    getting this wrong in either direction (over- or under-inclusive) is
+    the single biggest risk in this rule.
+  - >
+    Branch A's disclosure FREQUENCY requirement varies meaningfully by
+    state — applying Washington's strict "every 3 hours, no exceptions"
+    standard to a California-only deployment would over-state the
+    requirement; conversely applying California's narrower "reasonable
+    person, no recurring requirement for adults" standard to a Washington
+    deployment would under-state it. RegKit must know which state(s) a
+    deployment serves, via regkit.yaml jurisdiction declaration, to apply
+    the correct per-state standard rather than picking one as a default.
+  - >
+    Manipulative-technique and professional-licensure detection both
+    explicitly acknowledge their own limitation: RegKit can flag prompt/
+    system-message TEXT for human review, but cannot make a definitive
+    legal determination purely from conventional code-structure analysis,
+    unlike most of RegKit's other AST-pattern-based rules.
+  - >
+    Georgia SB 540's enactment status must be confirmed by AGENT-7 before
+    treating it as binding law — at time of this rule's construction it
+    was reported as "awaiting gubernatorial action," not yet signed.
+
+message:
+  developer_facing: >
+    This chatbot interface is in scope for {applicable_states} chatbot
+    disclosure requirements. RegKit found: {findings_summary}. {if Branch
+    B applies}: This chatbot also appears to meet the "AI companion"
+    capability test (sustained relationship, personalized dialogue across
+    sessions) — additional safety protocol obligations apply in
+    {companion_applicable_states}, including crisis detection/referral and
+    (in some states) restrictions on manipulative engagement techniques.
+
+  suggested_fix: >
+    {disclosure_missing}: Add a session-start AI disclosure, with recurring
+    reminders matching the strictest applicable state standard among your
+    deployment's actual user geography (Washington's every-3-hours-for-
+    adults/every-1-hour-for-minors is currently the most prescriptive — 
+    adopting it as a baseline satisfies the less strict states too).
+    {crisis_protocol_missing}: Implement crisis-keyword detection in the
+    response pipeline with a defined interrupt-and-refer behavior; for
+    Oregon-covered deployments specifically, this must be active content
+    monitoring, not just a static disclosure.
+    {manipulative_pattern_flagged}: Have a human reviewer examine the
+    flagged prompt/system-message content against the specific prohibited-
+    technique list for your applicable state(s).
+
+  auto_fix_available: true
+  auto_fix_description: >
+    RegKit scaffolds the session-start disclosure call and a timer-based
+    reminder mechanism calibrated to the strictest applicable state
+    standard. RegKit can scaffold a crisis-keyword-detection interrupt
+    point in the response pipeline, but the actual classifier/keyword set
+    and crisis-resource content must be reviewed and approved by a human
+    (ideally with clinical input) before going live — RegKit will not
+    auto-generate crisis-response content itself.
+
+evidence_contribution:
+  - document: "Algorithmic Impact Assessment"
+    section: "Multi-state chatbot disclosure compliance log, with companion-AI classification flag if applicable"
+  - document: "AI System Data Flow Diagram"
+    section: "Consumer-facing chat interfaces flagged with applicable state disclosure regime"
+
+monitoring_note_for_agent_7: >
+  THIS IS THE FASTEST-MOVING CLUSTER IN REGKIT'S ENTIRE RULE SET. Per
+  Orrick's April 2026 tracking, "dozens of the nearly 100 chatbot bills
+  introduced this year continue to move through the legislative process,"
+  and federal proposals (SAFE Bots Act, GUARD Act, CHAT Act) are also
+  active. Re-verify this rule's state list and per-state requirements at
+  minimum monthly, not quarterly like most other rules in this set.
+  Specifically watch: (1) Georgia SB 540 signature status, (2) Connecticut
+  SB 5 (passed Senate April 2026, watch for House/signature), (3) any
+  federal preemption attempt specifically targeting this cluster, since
+  chatbot/minor-safety laws have high public salience and could be an
+  early target for the federal AI Litigation Task Force in either
+  direction (challenging OR defending, depending on administration
+  priorities at time of monitoring).
+
+test_cases:
+  should_trigger_branch_a_only:
+    - code: |
+        async function handleSupportChat(userMessage) {
+          const response = await llm.complete(supportPrompt + userMessage);
+          return response;
+        }
+      config: "jurisdictions: [WA, OR, CA]"
+      reason: >
+        No disclosure at all — Branch A violation. Does NOT trigger Branch
+        B because this is a transactional support bot with no sustained-
+        relationship capability — single-turn support queries, no
+        cross-session memory or personalized dialogue.
+
+  should_trigger_both_branches:
+    - code: |
+        async function companionChat(userId, message) {
+          const history = await db.getConversationHistory(userId); // cross-session memory
+          const response = await llm.complete(companionPersonaPrompt + history + message);
+          return response;
+        }
+      config: "jurisdictions: [WA, OR], no disclosure, no crisis detection"
+      reason: >
+        Cross-session memory + persona-driven dialogue meets the AI
+        companion capability test — both branches apply.
+
+  should_not_trigger:
+    - code: |
+        async function companionChat(userId, message) {
+          await regkit.disclose({ type: 'chatbot_ai_notice', recurring: '3h' });
+          const crisisSignal = await crisisClassifier.check(message);
+          if (crisisSignal.detected) {
+            return craftCrisisReferralResponse(crisisSignal);
+          }
+          const history = await db.getConversationHistory(userId);
+          const response = await llm.complete(companionPersonaPrompt + history + message);
+          return response;
+        }
+      reason: "Disclosure present with recurring reminder, crisis detection active, response interrupted on crisis signal"

@@ -1,0 +1,20 @@
+{
+  "name": "regkit-scanner-mvp",
+  "version": "0.1.0",
+  "description": "RegKit MVP scanner - AI compliance detection via tree-sitter AST analysis",
+  "main": "cli.js",
+  "bin": {
+    "regkit": "./cli.js"
+  },
+  "scripts": {
+    "scan": "node cli.js scan",
+    "test": "node cli.js scan test-fixtures/patient-risk-assessment.js --config test-fixtures/regkit.yaml"
+  },
+  "dependencies": {
+    "tree-sitter": "0.21.1",
+    "tree-sitter-javascript": "0.21.4",
+    "tree-sitter-typescript": "0.21.2",
+    "js-yaml": "^4.1.0",
+    "chalk": "^4.1.2"
+  }
+}

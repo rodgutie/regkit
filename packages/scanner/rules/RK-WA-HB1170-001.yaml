@@ -1,0 +1,259 @@
+# RegKit Rule: RK-WA-HB1170-001
+# Washington HB 1170 — AI content provenance disclosure
+# (THIS IS THE CORRECTION RULE referenced in the MVP tracker — HB 1170
+# was previously miscategorized as a chatbot-disclosure law; it is
+# actually a content-provenance/watermarking law, same family as
+# California SB 942)
+#
+# Legal basis: 2026 Wn. Sess. Laws, HB 1170 ("informing users when
+# content is developed or modified by artificial intelligence")
+#
+# *** EFFECTIVE DATE CONFLICT IN SOURCE MATERIAL — FLAGGED, NOT GUESSED ***
+# Multiple law-firm trackers disagree on the effective date: several cite
+# January 1, 2028 (matching the bill text's own "Sec. 8. This act takes
+# effect January 1, 2028" language found in the enrolled bill PDF), while
+# at least one source states February 1, 2027. RegKit treats the bill
+# text itself (January 1, 2028) as authoritative since it is the primary
+# source, but flags this discrepancy explicitly for AGENT-7 to resolve
+# definitively against the Revised Code of Washington once codified,
+# rather than silently picking one date without disclosing the conflict.
+# This is exactly the kind of ambiguity a compliance tool should surface
+# to a human, not paper over.
+#
+# RELATIONSHIP TO RK-CA-SB942-001: this rule is intentionally THIN and
+# reuses RK-CA-SB942-001's AST detection logic almost entirely, since the
+# underlying technical pattern (provenance metadata embedded in
+# generated media) is the same. The differences worth encoding distinctly
+# are: (1) HB 1170's manifest disclosure is OPTIONAL like California's,
+# but unlike SB 942, latent/provenance data requirements have narrower
+# THRESHOLD criteria in some drafts (compute-based + revenue-based
+# thresholds appeared in Senate committee materials, not just a flat
+# monthly-user count) — RegKit checks BOTH possible threshold formulations
+# pending final codification clarity, (2) NO private right of action,
+# (3) materially narrower exemption list than first appears.
+
+id: RK-WA-HB1170-001
+name: "GenAI-generated image/video/audio content lacks Washington-required provenance data or detection tool"
+severity: BLOCK
+  # BLOCK for the provenance-embedding and detection-tool branches,
+  # mirroring RK-CA-SB942-001's severity logic exactly, since the
+  # underlying obligation shape is functionally identical.
+
+regulation:
+  framework: "Washington HB 1170"
+  citation: "2026 Wn. Sess. Laws, HB 1170 (2nd Substitute, as enrolled)"
+  effective_date: >
+    January 1, 2028 per the enrolled bill text ("Sec. 8. This act takes
+    effect January 1, 2028") — NOTE: at least one secondary source states
+    February 1, 2027; RegKit defaults to the primary bill text date and
+    flags the discrepancy for AGENT-7 verification against the eventual
+    RCW codification.
+  enforcement_authority: >
+    Washington Attorney General EXCLUSIVELY, under the Consumer Protection
+    Act — violations are deemed to affect the public interest and
+    constitute an unfair/deceptive act. NO PRIVATE RIGHT OF ACTION exists
+    under this statute (a meaningful difference from BIPA and some
+    companion-chatbot laws also in RegKit's rule set).
+  applies_to: >
+    "Covered provider" — definitional threshold has some ambiguity across
+    sources: most describe simply ">1,000,000 monthly users, publicly
+    accessible in Washington for personal use." However, Senate committee
+    materials separately describe a covered provider as one using a
+    threshold amount of compute to train a foundation model AND having
+    annual gross revenue exceeding $500 million — a MUCH higher bar than
+    the 1-million-user framing used elsewhere. RegKit flags BOTH possible
+    threshold readings pending AGENT-7 confirmation of which definition
+    survived to the final enrolled text, rather than committing to the
+    lower (more inclusive) threshold without confirmation, since
+    overstating applicability to a smaller company would be a real
+    customer-trust cost.
+  scope_by_content_type: "Image, video, audio, or any combination — created or MATERIALLY ALTERED"
+  material_alteration_definition: >
+    Significant changes that substantially alter the content's data —
+    explicitly EXCLUDES minor edits like brightness/color adjustment,
+    cropping, resizing, or compression. RegKit's AST pattern for the
+    generation-call trigger should NOT fire on basic image-processing
+    operations (resize, crop, color-correct) absent a genuine generative/
+    alteration model call.
+  explicit_exclusions: >
+    Business-to-business use, sale, licensing, or distribution of GenAI
+    systems; products/services exclusively providing video games or
+    interactive experiences; systems used SOLELY for upscaling, noise
+    reduction, or compression. Government, tribal, and local entities are
+    also excluded from the "covered provider" definition (though a
+    SEPARATE provision requires government agencies to disclose AI
+    interactions to consumers — a distinct, narrower obligation not
+    covered by this rule, which focuses on the covered-provider provenance
+    requirement).
+
+detection:
+  trigger_conditions_independent_branches:
+
+    - rule_branch: "mandatory_provenance_data"
+      severity: BLOCK
+      mandatory: true
+      description: >
+        Same detection pattern as RK-CA-SB942-001's latent_disclosure
+        branch: a generation/alteration model call producing image/video/
+        audio output with no detectable embedded provenance metadata
+        (watermarking or metadata, per the statute's own stated compliance
+        mechanisms) before the output reaches an artifact (file write, API
+        response, CDN upload).
+      reuses_detection_logic_from: "RK-CA-SB942-001.detection.trigger_conditions_independent_branches.mandatory_latent_disclosure"
+      material_alteration_filter: >
+        UNLIKE the California rule (which does not have an equivalent
+        "material alteration" carve-out stated this explicitly), this
+        rule's AST pattern must FIRST confirm the operation is a genuine
+        generative/material alteration (not a basic resize/crop/color/
+        compression operation) before flagging — applying RK-CA-SB942-001's
+        pattern verbatim without this filter would over-flag ordinary image
+        processing pipelines that have nothing to do with GenAI.
+
+    - rule_branch: "manifest_disclosure_option"
+      severity: WARN
+      mandatory: false
+      description: >
+        Same shape as RK-CA-SB942-001's manifest branch: provider must
+        OFFER users the option to add a visible AI-generated label;
+        users may decline. Checks for a functional UI/API option, not
+        forced application.
+      reuses_detection_logic_from: "RK-CA-SB942-001.detection.trigger_conditions_independent_branches.manifest_disclosure_option"
+
+    - rule_branch: "public_detection_tool"
+      severity: BLOCK
+      description: >
+        Identical obligation shape to California's: covered provider must
+        offer a free tool (at no cost) allowing detection of whether
+        content was made/altered by their system. Unlike the California
+        rule, HB 1170 ADDITIONALLY restricts what the provider may do with
+        data collected through that tool: may NOT collect or retain
+        personal information from tool users UNLESS that information is
+        user-submitted feedback used to improve the tool. RegKit checks
+        for this additional data-handling constraint specifically, since
+        it has no California equivalent in RK-CA-SB942-001.
+      ast_pattern: >
+        Same project-level check as RK-CA-SB942-001 (regkit.yaml
+        `provenance_detection_tool_url`), PLUS an additional check that
+        the detection-tool's data-handling logic does not retain personal
+        information beyond explicit user-submitted feedback.
+
+    - rule_branch: "government_agency_disclosure"
+      severity: BLOCK
+      description: >
+        SEPARATE, narrower obligation not present in the California
+        framework: government agencies (state/local, not covered
+        providers generally) must clearly and conspicuously disclose,
+        before or at the time of interaction, that a consumer is
+        interacting with an AI system — using plain language, avoiding
+        deceptive practices. This branch only fires for codebases
+        explicitly tagged as a government/public-sector deployment in
+        regkit.yaml, not for ordinary private-sector covered providers.
+      narrow_applicability: >
+        Most RegKit customers (private fintech/healthtech/HR-tech
+        companies) will NOT trigger this branch — it is included for
+        completeness given RegKit's government-sector rule pack exists
+        separately, and a Washington-specific government deployment
+        should know this distinct obligation applies on top of (not
+        instead of) general government AI transparency expectations.
+
+false_positive_guards:
+  - >
+    Does NOT fire on basic image-processing operations (resize, crop,
+    color/brightness adjustment, compression) — these are explicitly
+    excluded as non-"material" alterations. This is the single most
+    important guard specific to this rule versus its California cousin,
+    since RK-CA-SB942-001 does not have an equivalently explicit statutory
+    carve-out phrased this way.
+  - >
+    Does not apply to B2B-only GenAI distribution, video-game/interactive-
+    experience-only products, or systems used solely for upscaling/noise-
+    reduction/compression — all explicitly excluded.
+  - >
+    Does NOT assume a private right of action exists — unlike BIPA or some
+    companion-chatbot statutes in this rule set, enforcement here is
+    EXCLUSIVELY through the Washington AG. Remediation urgency messaging
+    should reflect agency-enforcement timelines/patterns, not class-action
+    litigation risk framing.
+  - >
+    Covered-provider threshold is FLAGGED AS AMBIGUOUS in this rule's own
+    documentation rather than asserted confidently — do not silently apply
+    the lower (1-million-user) threshold as if it were settled without
+    surfacing the higher (compute + $500M revenue) threshold language found
+    in Senate committee materials. A customer significantly below the
+    higher threshold but above the lower one should be told about this
+    ambiguity, not given false confidence either way.
+
+message:
+  developer_facing: >
+    This code generates or materially alters {media_type} content via a
+    GenAI system that may meet Washington HB 1170's covered-provider
+    threshold (NOTE: threshold definition has some ambiguity across
+    sources — RegKit flags this for your legal team to confirm against
+    final codified text). RegKit found: {findings_summary}. Provenance
+    data (watermarking/metadata) is mandatory for genuine generative/
+    material-alteration operations — ordinary resize/crop/compression
+    does not trigger this requirement. Enforcement is exclusively via the
+    WA Attorney General; no private right of action exists under this
+    specific statute.
+
+  suggested_fix: >
+    Reuse the same regkit.embedProvenance() scaffold built for
+    RK-CA-SB942-001 — the technical compliance pattern (watermarking or
+    metadata, difficult to remove/tamper with) is materially the same
+    across both states. Confirm your detection tool's data-handling logic
+    does not retain personal information beyond user-submitted feedback,
+    which is a WA-specific additional constraint beyond what California
+    requires.
+
+  auto_fix_available: true
+  auto_fix_description: >
+    Reuses RK-CA-SB942-001's auto-fix scaffold for provenance embedding
+    and manifest-disclosure UI options. The additional WA-specific
+    detection-tool data-retention constraint requires a separate, small
+    code review of the detection tool's data-handling logic — not a
+    pure code-generation fix.
+
+evidence_contribution:
+  - document: "AI System Data Flow Diagram"
+    section: "Cross-referenced alongside California SB 942 findings for the same generation endpoints, since many customers will be dual-covered"
+
+monitoring_note_for_agent_7: >
+  HIGH PRIORITY: (1) Resolve the effective-date discrepancy (Jan 1 2028
+  per bill text vs. Feb 1 2027 per at least one secondary source) against
+  the final RCW codification once available, (2) resolve the covered-
+  provider threshold discrepancy (1M monthly users vs. compute+$500M
+  revenue) — these appear to be from different bill drafts/committee
+  stages and the FINAL enrolled threshold must be confirmed, not assumed,
+  (3) watch for Washington AG guidance/advisory opinions, since this is a
+  newly enacted law with no enforcement history yet to calibrate severity
+  or remediation urgency against.
+
+test_cases:
+  should_trigger:
+    - code: |
+        async function generateMarketingVideo(prompt) {
+          const video = await videoGenModel.generate(prompt);
+          await cdn.upload(video, outputPath);
+          return outputPath;
+        }
+      config: "monthly_users: 2000000, jurisdiction_includes: WA"
+      reason: "Genuine video generation with no provenance embedding"
+
+  should_not_trigger:
+    - code: |
+        async function resizeProfileImage(image, dimensions) {
+          return await imageProcessor.resize(image, dimensions);
+        }
+      reason: "Basic resize operation — explicitly excluded as not a 'material alteration'"
+
+    - code: |
+        async function generateMarketingVideo(prompt) {
+          const video = await videoGenModel.generate(prompt);
+          const withProvenance = await regkit.embedProvenance(video, {
+            provider: 'AcmeCorp', system: 'AcmeVideoGen', timestamp: Date.now()
+          });
+          await cdn.upload(withProvenance, outputPath);
+          return outputPath;
+        }
+      config: "provenance_detection_tool_url: https://acmecorp.com/wa-ai-detector, detection_tool_retains_pii: false"
+      reason: "Provenance embedded, detection tool exists with compliant data-retention practice"
