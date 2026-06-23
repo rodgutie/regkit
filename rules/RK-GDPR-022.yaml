@@ -1,0 +1,193 @@
+# RegKit Rule: RK-GDPR-022
+# GDPR Article 22 — Automated individual decision-making, including profiling
+#
+# Legal basis: Regulation (EU) 2016/679, Article 22
+#
+# KEY NUANCE (different from EU AI Act Art. 14 — do not conflate the two):
+# GDPR Art. 22 is narrower than EU AI Act Art. 14. It only applies when a
+# decision is: (1) based SOLELY on automated processing, AND (2) produces
+# legal effects OR similarly significant effects on the individual. A
+# product recommendation has no "legal or similarly significant effect" —
+# a credit denial, a hiring rejection, or an insurance premium calculation
+# does. The trigger condition must check BOTH the "solely automated" AND
+# the "significant effect" prongs, or this rule over-fires constantly.
+#
+# ALSO CRITICAL: a human review step only defeats "solely automated" status
+# if it is MEANINGFUL — defined by regulators as the reviewer having real
+# authority and competence to change the outcome, not a rubber-stamp click.
+# RegKit cannot verify "meaningfulness" from code alone (that's an
+# organizational/process fact, not a code fact) — so this rule flags for
+# human attention rather than auto-resolving on the mere presence of a
+# review function call, which is a deliberately more conservative posture
+# than RK-EUAI-014.
+
+id: RK-GDPR-022
+name: "Solely automated decision with legal or significant effect, no documented human involvement"
+severity: BLOCK
+
+regulation:
+  framework: "GDPR"
+  citation: "Regulation (EU) 2016/679, Article 22"
+  summary: >
+    A data subject has the right not to be subject to a decision based
+    solely on automated processing, including profiling, which produces
+    legal effects concerning them or similarly significantly affects them
+    (Art. 22(1)). Permitted only if: necessary for a contract (22(2)(a)),
+    authorized by Union/Member State law with suitable safeguards
+    (22(2)(b)), or based on explicit consent (22(2)(c)). Where permitted,
+    the controller must implement suitable measures including, at minimum,
+    the right to obtain human intervention, to express a point of view,
+    and to contest the decision (Art. 22(3)). Special category data
+    (Art. 9(1)) cannot be the basis for such decisions absent explicit
+    consent or substantial public interest with safeguards (Art. 22(4)).
+  penalty: "Up to €20M or 4% of global annual turnover, whichever is higher"
+
+detection:
+  trigger_conditions:
+    both_required:
+      - description: "Solely automated — no meaningful human involvement anywhere in the decision path"
+        ast_pattern: >
+          AI/ML model output flows directly into an action-taking function
+          (deny(), approve(), reject(), priceQuote(), rank(), score()) with
+          no call to a human-review or human-intervention function reachable
+          in the execution path, AND no organizational flag in regkit.yaml
+          declaring `human_in_loop: true` with a named reviewer role.
+      - description: "Legal or similarly significant effect"
+        classification_source: "AGENT-1 risk context — domains that qualify"
+        qualifying_domains:
+          - credit_or_lending_decisions
+          - employment_hiring_or_termination
+          - insurance_underwriting_or_claims
+          - access_to_essential_services
+          - legal_status_determinations
+          - pricing_with_material_financial_impact
+        non_qualifying_examples:
+          - product_recommendations
+          - content_personalization
+          - search_ranking_without_denial_of_service
+          - internal_tooling_with_no_external_effect
+
+  exception_check:
+    - exception: "contractual_necessity"
+      config_flag: "gdpr_art22_basis: contract_necessity"
+      still_requires: "Art. 22(3) safeguards below — exception removes the prohibition, NOT the safeguard duty"
+    - exception: "explicit_consent"
+      config_flag: "gdpr_art22_basis: explicit_consent"
+      still_requires: "documented consent record reference + Art. 22(3) safeguards"
+    - exception: "authorized_by_law"
+      config_flag: "gdpr_art22_basis: legal_authorization"
+      still_requires: "citation to specific authorizing law in regkit.yaml + Art. 22(3) safeguards"
+
+  mandatory_safeguards_if_exception_applies:
+    # Even when Art. 22(2) permits the automated decision, Art. 22(3)
+    # safeguards are NOT optional. RegKit checks for all three.
+    - "Right to obtain human intervention — a reachable, documented contest/appeal pathway"
+    - "Right to express a point of view — an input mechanism the data subject can use before or after the decision"
+    - "Right to contest the decision — a defined process, not merely a contact email with no SLA"
+
+special_category_check:
+  description: >
+    Art. 22(4) — decisions under this article shall NOT be based on special
+    category data (race, ethnicity, political opinion, religion, trade union
+    membership, genetic data, biometric data for identification, health,
+    sex life, or sexual orientation) unless Art. 9(2)(a) explicit consent or
+    9(2)(g) substantial public interest applies, with suitable safeguards.
+  detection: >
+    AGENT-3 checks whether any Art. 9(1) special category field flows into
+    the automated decision input. If so, and neither consent nor public
+    interest basis is declared in regkit.yaml, severity escalates and this
+    becomes a compound violation citing both Art. 22(4) and Art. 9.
+
+false_positive_guards:
+  - >
+    Does not trigger on AI outputs that are advisory/informational only with
+    no downstream action function consuming the result in a way that affects
+    the individual (e.g. an internal analytics dashboard showing aggregate
+    risk trends with no per-individual action taken).
+  - >
+    Does not trigger merely because a human "approval" function exists in
+    the codebase if RegKit cannot find it reachable in the specific decision
+    path being analyzed — conversely, does not auto-clear merely because
+    SOME function call exists; it must be in the actual reachable call graph.
+  - >
+    Does NOT assess whether human review is "meaningful" in the regulatory
+    sense (real authority and competence to change the outcome) — that is
+    an organizational fact RegKit cannot verify from source code. When a
+    review function IS present, this rule downgrades from BLOCK to WARN
+    with a note: "Human review function detected — confirm reviewer has
+    genuine authority to override, per regulatory guidance on meaningful
+    human involvement, not just sign-off ritual."
+  - >
+    Distinguish from RK-EUAI-014 (EU AI Act Art. 14): that rule applies to
+    Annex III high-risk AI systems broadly and permits monitor-only
+    oversight for high-volume use cases. This rule (GDPR Art. 22) applies
+    specifically to decisions with legal/significant effect on a data
+    subject and has a narrower, stricter human-intervention requirement
+    when no Art. 22(2) exception applies. A system can pass one and fail
+    the other — check both independently.
+
+message:
+  developer_facing: >
+    This function makes a {domain} decision based solely on automated
+    processing with no documented human involvement, and this category of
+    decision can produce legal or similarly significant effects on the
+    individual. Under GDPR Article 22, this is prohibited unless a specific
+    exception applies (contractual necessity, legal authorization, or
+    explicit consent) — and even then, the individual must retain the right
+    to obtain human intervention, express their view, and contest the
+    decision.
+
+  suggested_fix: >
+    If no exception applies: add meaningful human involvement to this
+    decision path before automated output triggers any action — a person
+    with real authority to override the result, not a formality.
+    If an exception applies: declare it in regkit.yaml under
+    gdpr_art22_basis, and implement the three Art. 22(3) safeguards —
+    a contest/appeal pathway, a way for the subject to express their view,
+    and documented human intervention on request.
+
+  auto_fix_available: true
+  auto_fix_description: >
+    RegKit scaffolds a contest/appeal endpoint and a regkit.humanReviewGate()
+    wrapper. RegKit cannot determine which Art. 22(2) exception (if any)
+    applies to your business — that requires a legal basis determination
+    by the developer or compliance officer, recorded in regkit.yaml.
+
+evidence_contribution:
+  - document: "GDPR Data Protection Impact Assessment"
+    section: "Automated decision-making flags and safeguards (Art. 22)"
+  - document: "AI System Data Flow Diagram"
+    section: "Decisions with legal/significant effect highlighted"
+
+test_cases:
+  should_trigger:
+    - code: |
+        async function evaluateApplicant(application) {
+          const score = await mlModel.predict(application.features);
+          if (score < threshold) {
+            return rejectApplication(application.id);
+          }
+          return approveApplication(application.id);
+        }
+      domain: "employment_hiring_or_termination"
+      reason: "Solely automated, no human intervention, significant effect on applicant"
+
+  should_not_trigger:
+    - code: |
+        async function recommendProducts(userId) {
+          const recommendations = await mlModel.predict(userFeatures);
+          return recommendations;
+        }
+      reason: "Product recommendation — no legal or similarly significant effect"
+
+    - code: |
+        async function evaluateApplicant(application) {
+          const score = await mlModel.predict(application.features);
+          const finalDecision = await regkit.humanReviewGate({
+            aiScore: score,
+            reviewerRole: "senior_underwriter",
+            contestPathway: "/appeals/submit"
+          });
+          return finalDecision;
+        }
+      result: "Downgraded to WARN — human review function present, flagged for organizational confirmation of meaningfulness, not auto-cleared"
