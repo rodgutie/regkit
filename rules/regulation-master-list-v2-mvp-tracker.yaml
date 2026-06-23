@@ -1,0 +1,168 @@
+# RegKit Master Regulation List — MVP Tracker (v2)
+# Corrects the Washington HB 1170 misclassification found while building
+# RK-US-CHATBOT-001. Tracks exactly what's built, what's left for MVP,
+# and what's explicitly deferred past MVP on purpose.
+
+# ============================================================================
+# CORRECTION LOG
+# ============================================================================
+corrections:
+  - date_found: "during RK-US-CHATBOT-001 build"
+    error: "WA HB 1170 was listed in the chatbot-disclosure cluster"
+    correct_classification: >
+      HB 1170 is an AI CONTENT PROVENANCE law (manifest/latent disclosure
+      on generated media) — same family as CA SB 942, NOT a chatbot
+      disclosure law. Washington's actual companion-chatbot law is HB 2225,
+      which IS correctly covered in RK-US-CHATBOT-001.
+    action_taken: >
+      HB 1170 moved to the provenance/watermarking rule family below.
+      Recommend folding it into RK-CA-SB942-001 as an additional
+      jurisdiction, OR building RK-WA-HB1170-001 as a thin rule that
+      references the same detection logic, since the technical pattern
+      (provenance metadata on generated media) is identical to SB 942.
+    lesson: "Always verify bill SUBJECT MATTER against bill NUMBER — states pass multiple unrelated AI bills per session with similar names/numbers"
+
+# ============================================================================
+# RULES BUILT — 10 TOTAL
+# ============================================================================
+rules_built:
+  - RK-HIPAA-001          # PHI to AI vendor without BAA
+  - RK-EUAI-014           # EU AI Act Art. 14 human oversight
+  - RK-GDPR-022           # GDPR Art. 22 automated decisions
+  - RK-CO-ADMT-001        # Colorado SB 26-189 (current law, replaces dead SB 24-205)
+  - RK-TX-TRAIGA-001      # Texas TRAIGA — intent-based standard
+  - RK-NYC-LL144-001      # NYC AEDT bias audit + notice
+  - RK-IL-HB3773-001      # Illinois — outcome-based standard (contrasts TX)
+  - RK-CA-ADMT-001        # California CCPA ADMT regulations
+  - RK-CA-SB942-001       # California content provenance/watermarking
+  - RK-US-CHATBOT-001     # Multi-state chatbot disclosure + companion safety
+
+# ============================================================================
+# MVP DEFINITION — what "done enough to ship" actually means
+# ============================================================================
+mvp_scope_definition: >
+  MVP does NOT mean "every US AI law." It means: enough rule coverage
+  across enough DISTINCT LEGAL PATTERNS that a real design partner in
+  fintech, healthtech, or HR tech sees immediate, credible value in their
+  actual codebase within the first scan. Quality and distinctiveness of
+  patterns matters more than raw rule count at this stage.
+
+mvp_pattern_coverage_check:
+  # The actual test: does RegKit's rule set cover every FUNDAMENTALLY
+  # DIFFERENT legal architecture a customer might hit? Not every law —
+  # every PATTERN. Checking current coverage against this list:
+  patterns_covered:
+    - pattern: "vendor-contract-based (BAA-style)"
+      covered_by: RK-HIPAA-001
+      status: DONE
+    - pattern: "design-requirement, proportionate-to-risk"
+      covered_by: RK-EUAI-014
+      status: DONE
+    - pattern: "individual-rights, 'meaningful human involvement' gate"
+      covered_by: RK-GDPR-022
+      status: DONE
+    - pattern: "notice-and-transparency only (no discrimination prohibition)"
+      covered_by: RK-CO-ADMT-001, RK-NYC-LL144-001
+      status: DONE — covered twice from different angles, good redundancy
+    - pattern: "intent-based discrimination liability"
+      covered_by: RK-TX-TRAIGA-001
+      status: DONE
+    - pattern: "outcome-based / strict-liability discrimination"
+      covered_by: RK-IL-HB3773-001
+      status: DONE
+    - pattern: "consumer rights + functioning opt-out requirement"
+      covered_by: RK-CA-ADMT-001
+      status: DONE
+    - pattern: "content generation provenance/watermarking"
+      covered_by: RK-CA-SB942-001
+      status: DONE
+    - pattern: "conversational AI disclosure + real-time safety monitoring"
+      covered_by: RK-US-CHATBOT-001
+      status: DONE
+
+  patterns_NOT_yet_covered:
+    - pattern: "data minimization / training data transparency"
+      relevant_law: "CA AB 2013 (training data summary disclosure)"
+      status: MISSING — only relevant to MODEL DEVELOPERS, not RegKit's
+        early app-layer customers (fintech/health/HR companies calling
+        OpenAI/Anthropic APIs, not training their own foundation models).
+      mvp_decision: DEFER — low priority for design partners, build post-MVP
+    - pattern: "frontier-model safety/incident reporting"
+      relevant_law: "CA SB 53 (TFAIA), NY RAISE Act"
+      status: MISSING
+      mvp_decision: >
+        DEFER — explicitly targets frontier labs at the
+        10^26 FLOPS / $500M+ revenue scale. Zero realistic overlap with
+        RegKit's target customer base at MVP. Build later purely for
+        credibility/completeness, never urgency.
+    - pattern: "biometric consent (standalone, beyond what's referenced inline)"
+      relevant_law: "Illinois BIPA as its own rule (currently only referenced inline in other rules)"
+      status: PARTIALLY MISSING
+      mvp_decision: >
+        BUILD — this is a real gap. BIPA has the highest individual
+        litigation exposure of anything in the master list (class actions
+        reaching $1B+) and deserves its own rule, not just inline
+        references. ADD TO MVP SCOPE.
+    - pattern: "credit/lending specific federal requirements (FCRA/ECOA depth)"
+      relevant_law: "FCRA adverse action notice content, ECOA Reg B specifics"
+      status: PARTIALLY MISSING — touched on conceptually inside RK-IL-HB3773-001
+        and RK-CA-ADMT-001 but no STANDALONE federal fintech rule exists yet
+      mvp_decision: >
+        BUILD — fintech is explicitly the #1 target vertical in RegKit's
+        own go-to-market plan. Shipping MVP with zero standalone federal
+        fintech rule, when fintech is the priority ICP, is a real gap.
+        ADD TO MVP SCOPE.
+    - pattern: "healthcare-specific beyond HIPAA (FDA SaMD)"
+      relevant_law: "FDA Software as Medical Device framework"
+      status: MISSING
+      mvp_decision: >
+        DEFER — narrower trigger (clinical diagnosis/treatment AI
+        specifically) than HIPAA's broad PHI-handling trigger. HIPAA rule
+        already covers the higher-frequency healthtech fact pattern.
+        Build post-MVP once a design partner specifically needs it.
+
+# ============================================================================
+# FINAL MVP BUILD LIST — exactly 3 more rules, then ship
+# ============================================================================
+final_mvp_build_queue:
+  1:
+    id: "RK-IL-BIPA-001"
+    name: "Illinois BIPA standalone biometric consent rule"
+    why: "Highest litigation exposure in the entire master list (class actions $1B+), deserves dedicated treatment, not just inline references"
+    estimated_effort: "1 build session"
+
+  2:
+    id: "RK-US-FCRA-ECOA-001"
+    name: "Federal FCRA + ECOA adverse action notice and reason-code requirements"
+    why: "Fintech is RegKit's #1 target vertical per its own go-to-market plan — shipping without a standalone federal credit rule is a real gap, not a nice-to-have"
+    estimated_effort: "1 build session"
+
+  3:
+    id: "RK-WA-HB1170-001"
+    name: "Washington content provenance (correcting the cluster error above)"
+    why: "Closes the correction loop from this document — reuses RK-CA-SB942-001's detection logic almost entirely, should be a FAST build since the technical pattern is already proven"
+    estimated_effort: "0.5 build session — mostly reusing existing logic with WA-specific citation/penalty swap"
+
+  after_these_three: >
+    STOP ADDING RULES. Move to: (1) actually wiring these 13 YAML rule
+    files into a working tree-sitter AST scanner — even a rough one,
+    (2) packaging the VS Code extension alpha, (3) running it against 2-3
+    design partners' REAL codebases to see what breaks, what's noisy, and
+    what's missing — THEIR feedback should drive the NEXT batch of rules,
+    not more solo research. Rule-writing in a vacuum has diminishing
+    returns past this point; real usage data is more valuable than rule
+    #14 written without a live codebase to test it against.
+
+# ============================================================================
+# WHY STOP AT 13, NOT KEEP GOING TO 30+
+# ============================================================================
+rationale_for_stopping_here: >
+  Every fundamentally distinct LEGAL PATTERN a near-term customer will
+  realistically hit is now covered at least once. Adding rule #14, #15,
+  #20 from here mostly means covering MORE STATES with the SAME pattern
+  already proven (e.g., a 9th chatbot-disclosure state, a 4th notice-only
+  state) — valuable eventually, but lower marginal value than getting the
+  actual scanning engine working and in front of a real compliance
+  officer. The fastest path to validating whether RegKit's core thesis
+  works is a working demo on a real codebase, not a longer rule list that
+  nobody outside this conversation has seen yet.
