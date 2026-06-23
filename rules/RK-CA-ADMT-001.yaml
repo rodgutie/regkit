@@ -1,0 +1,269 @@
+# RegKit Rule: RK-CA-ADMT-001
+# California CCPA ADMT Regulations — pre-use notice, opt-out, access, and
+# appeal rights for Automated Decision-Making Technology used in
+# "Significant Decisions"
+#
+# Legal basis: Cal. Code Regs. tit. 11, §§ 7200-7222 (CPPA final
+# regulations, approved by OAL September 22-23, 2025)
+# Regulations effective: January 1, 2026
+# ADMT-specific compliance deadline: January 1, 2027
+#
+# RELATIONSHIP TO OTHER RULES IN THIS SET:
+# This rule occupies similar conceptual territory to RK-GDPR-022 (solely
+# automated decisions with significant effect) but is NOT identical, and
+# RegKit treats them as independent findings:
+#   - GDPR Art. 22 is rights-based and EU-wide; "solely automated" is the
+#     key gate, and meaningful human involvement defeats it.
+#   - CCPA ADMT is California-specific, defines "significant decision" by
+#     an explicit, narrower domain list (finance, housing, education,
+#     employment, healthcare — NOT advertising, which was deliberately
+#     excluded from the final rule after appearing in earlier drafts), and
+#     additionally requires risk assessments and specific notice content
+#     that GDPR does not mandate in the same form.
+# A system can satisfy GDPR Art. 22 (human review present) while still
+# needing CCPA ADMT compliance work (pre-use notice, opt-out mechanism,
+# access/explanation request handling) because the two regimes ask for
+# different things even when the underlying "human in the loop" fact
+# pattern overlaps.
+
+id: RK-CA-ADMT-001
+name: "ADMT used for a Significant Decision without required pre-use notice, opt-out, access, or appeal mechanism"
+severity: WARN
+  # WARN, not BLOCK, reflecting the actual compliance timeline: the
+  # regulations are EFFECTIVE January 1, 2026, but the substantive ADMT
+  # obligations (notice, opt-out, access, appeal) are not required until
+  # January 1, 2027. RegKit treats 2026 findings as forward-looking
+  # readiness gaps. AGENT-7 should escalate this rule's default severity
+  # to BLOCK automatically as the calendar crosses into 2027, and
+  # immediately for any new ADMT deployed on or after Jan 1, 2027, since
+  # new deployments must comply "prior to first use" with no grace period.
+
+regulation:
+  framework: "California CCPA ADMT Regulations"
+  citation: "Cal. Code Regs. tit. 11, §§ 7200-7222"
+  effective_date: "January 1, 2026 (regulations); January 1, 2027 (ADMT substantive compliance deadline)"
+  enforcement_authority: "California Privacy Protection Agency (CPPA)"
+  compliance_timing_detail: >
+    If ADMT was used for significant decisions prior to January 1, 2027,
+    compliance must be in place BY January 1, 2027. ADMT deployed ON OR
+    AFTER January 1, 2027 must comply PRIOR TO FIRST USE — no transition
+    grace period for new deployments.
+  summary: >
+    A business using Automated Decision-Making Technology (ADMT) to make a
+    "Significant Decision" about a California consumer must: (1) conduct a
+    risk assessment before training or using the ADMT for this purpose,
+    (2) provide a pre-use notice stating the specific purpose and how to
+    exercise rights, (3) provide an opt-out mechanism unless an exception
+    applies, (4) provide access/explanation of the logic and inputs used
+    upon request, and (5) provide an appeal process with human review and
+    defined timelines.
+
+key_definitions:
+  admt: >
+    "Any technology that processes personal information and uses
+    computation to replace human decision-making or substantially replace
+    human decision-making." A decision substantially replaces human
+    involvement if the output is used to make the decision WITHOUT
+    MEANINGFUL HUMAN REVIEW — note the conceptual overlap with GDPR's
+    "meaningful" standard, but this is a SEPARATE California-specific
+    determination, not an automatic cross-reference to a GDPR finding.
+
+  significant_decision:
+    includes:
+      - "provision or denial of financial services or lending"
+      - "housing"
+      - "education enrollment or opportunity"
+      - "employment or independent contractor opportunities, or compensation"
+      - "healthcare services"
+    explicitly_excludes:
+      - "advertising to a consumer — this was REMOVED from earlier draft regulations and is NOT a significant decision under the final rule"
+    additional_trigger_independent_of_significant_decision: >
+      Separately, "profiling a consumer through systematic observation"
+      while they are acting as an educational program applicant, job
+      applicant, student, employee, or independent contractor — this
+      triggers ADMT obligations even without a standalone "significant
+      decision," because systematic observation in these roles is treated
+      as inherently high-risk.
+
+detection:
+  trigger_conditions:
+    - description: >
+        AI/ML model or rules-based computation processes California
+        consumer personal information and its output is used to make or
+        substantially replace a human decision in a covered Significant
+        Decision domain, with no meaningful human review reachable in the
+        call graph.
+      qualifying_domains:
+        - financial_services_or_lending
+        - housing
+        - education_enrollment_or_opportunity
+        - employment_or_contractor_opportunity_or_compensation
+        - healthcare_services
+      explicitly_non_qualifying:
+        - advertising  # deliberately excluded in final rule — do not flag ad-targeting/ad-personalization code under this rule
+      systematic_observation_branch:
+        description: >
+          Independently triggers when code performs methodical/regular/
+          continuous observation (the regulation's examples: Wi-Fi/
+          Bluetooth tracking, RFID, drones, video/audio recording or
+          livestreaming, physical/biological identification or profiling
+          tech, geofencing, location trackers, license-plate recognition)
+          of a person in their capacity as a job applicant, employee,
+          student, or independent contractor.
+        ast_pattern: >
+          Continuous/periodic monitoring or tracking function (webcam
+          analysis, keystroke logging, geolocation polling, biometric
+          capture) reachable in a context tagged employee/applicant/
+          student/contractor, regardless of whether a "significant
+          decision" results.
+
+  required_elements_checked:
+    - element: "pre-use notice"
+      requirement: >
+        Notice at or before collection, stating the specific purpose for
+        using ADMT and how to exercise rights — must appear where the
+        workflow begins, not buried in a general privacy policy.
+      ast_pattern: "regkit.disclose() tagged ca_admt_notice, reachable before the ADMT processing begins, not merely present somewhere in app"
+
+    - element: "opt-out mechanism with functioning alternative path"
+      requirement: >
+        NOT just a link or button — the regulation requires a genuine
+        alternative decision path that does NOT rely on the ADMT output.
+        RegKit checks for the EXISTENCE of an alternative code path, not
+        just a UI element, since per CPPA's own enforcement signals, a
+        button with no functioning alternative behind it is non-compliant
+        even if it visually exists.
+      ast_pattern: >
+        A conditional branch reachable from the opt-out trigger that
+        routes to a non-ADMT decision path (e.g. manual review queue),
+        not merely a UI checkbox with no backend effect.
+      exceptions_recognized:
+        - "security, fraud prevention, and safety — business uses ADMT solely for this purpose"
+        - "evaluation exception — business evaluated the ADMT to ensure it worked as intended and was non-discriminatory, AND implemented safeguards to ensure it continues working as intended"
+      exceptions_do_not_apply_to:
+        - "ADMT used for profiling for behavioral advertising"
+        - "use of consumer personal information to TRAIN the ADMT itself"
+
+    - element: "access and explanation mechanism"
+      requirement: >
+        Mechanism to respond to requests about ADMT use, in plain
+        language, including the logic and inputs used and the rationale
+        for the specific outcome — not a generic "we use AI" statement.
+      ast_pattern: "An access-request handler reachable that can retrieve the specific inputs and model/logic reference used for THIS consumer's decision, not just a static description"
+
+    - element: "appeal process with human review"
+      requirement: "A defined appeal pathway with human review and stated timelines — same conceptual shape as regkit.humanReviewGate() used elsewhere in RegKit, reusable here"
+      ast_pattern: "regkit.humanReviewGate() or equivalent reachable from a consumer-facing appeal trigger"
+
+  risk_assessment_check:
+    description: >
+      Independent of the four consumer-facing rights above, a risk
+      assessment must be completed BEFORE training or using ADMT for a
+      significant decision, and upon material change. RegKit checks for
+      a regkit.yaml reference to a completed risk assessment artifact,
+      similar to the audit-tracking pattern used in RK-NYC-LL144-001.
+    if_missing: "WARN — risk assessment gap, escalating to BLOCK as Jan 1 2027 deadline approaches or upon any new ADMT deployment"
+
+false_positive_guards:
+  - >
+    Does NOT trigger on advertising/ad-targeting/ad-personalization code,
+    even if AI-driven and even if it profiles users — advertising was
+    explicitly removed from the "significant decision" definition in the
+    final regulations after appearing in earlier drafts. This is a
+    deliberate, important exclusion to get right; many AI ad-tech products
+    will otherwise be incorrectly flagged.
+  - >
+    The opt-out check requires an ACTUAL alternative decision path, not
+    merely a UI element — RegKit does not clear this finding just because
+    a button exists; it traces whether a non-ADMT code path is genuinely
+    reachable from that button.
+  - >
+    Recognizes the security/fraud-prevention and evaluation exceptions to
+    the opt-out requirement specifically — but does NOT apply either
+    exception to behavioral-advertising profiling or to ADMT training data
+    use, per the regulation's explicit carve-out of the carve-out.
+  - >
+    Does not conflate this finding with a GDPR Art. 22 finding (RK-GDPR-
+    022) on the same code — the two regimes have different domain
+    definitions (CCPA explicitly excludes advertising; GDPR's "legal or
+    similarly significant effect" standard does not have an identical
+    explicit carve-out) and different required remedies. Report
+    independently.
+
+message:
+  developer_facing: >
+    This code uses ADMT for what appears to be a Significant Decision
+    under California's CCPA ADMT regulations ({domain}). RegKit found:
+    {missing_elements}. Full compliance is required by January 1, 2027 for
+    existing deployments, or immediately for new deployments on or after
+    that date. Required: pre-use notice, opt-out with genuine alternative
+    path, access/explanation mechanism, appeal with human review, and a
+    completed risk assessment.
+
+  suggested_fix: >
+    {notice_missing}: Add a pre-use notice at the point where ADMT
+    processing begins, not buried in a general privacy policy.
+    {optout_missing}: Implement a genuine alternative, non-ADMT decision
+    path reachable from the opt-out control — not just a UI element.
+    {access_missing}: Build a request-handler that can explain the
+    specific logic and inputs used for an individual consumer's decision.
+    {appeal_missing}: Add regkit.humanReviewGate() as the appeal pathway.
+    {risk_assessment_missing}: Complete a risk assessment before this
+    ADMT processes any more consumer data for this purpose.
+
+  auto_fix_available: true
+  auto_fix_description: >
+    RegKit scaffolds the notice dispatch, the appeal/human-review gate
+    (reusing the same regkit.humanReviewGate() primitive as other rules),
+    and an access-request handler stub. RegKit cannot build a genuine
+    alternative decision PATH for the opt-out requirement — that requires
+    actual alternative business logic, which is a product/process decision,
+    not a code-generation task.
+
+evidence_contribution:
+  - document: "GDPR Data Protection Impact Assessment"
+    section: "Cross-referenced — CCPA risk assessment shares structural similarity, but file as a SEPARATE artifact, not a substitute"
+  - document: "AI System Data Flow Diagram"
+    section: "California ADMT significant-decision systems flagged separately from GDPR Art. 22 systems"
+
+monitoring_note_for_agent_7: >
+  Watch cppa.ca.gov for: (1) any amendments to the "significant decision"
+  domain list (advertising's removal from the final rule suggests the
+  CPPA actively negotiates this list — future amendments are plausible),
+  (2) enforcement actions testing what counts as a "genuine alternative"
+  opt-out path — CPPA has signaled active testing of opt-out operability,
+  (3) guidance clarifying the "narrow exception for limited human
+  resources-related uses such as payroll, benefits administration, and
+  legally mandated reporting" mentioned in early CPPA commentary but not
+  fully detailed in the rule text RegKit has reviewed to date.
+
+test_cases:
+  should_trigger:
+    - code: |
+        async function evaluateLoanApplication(applicant) {
+          const decision = await mlModel.predict(applicant.features);
+          return { approved: decision.score > threshold };
+        }
+      domain: "financial_services_or_lending"
+      reason: "Significant decision domain, no notice/opt-out/access/appeal mechanisms present"
+
+  should_not_trigger:
+    - code: |
+        async function personalizeAdContent(userId) {
+          const adPreferences = await mlModel.predict(userProfile);
+          return selectAd(adPreferences);
+        }
+      reason: "Advertising — explicitly excluded from 'significant decision' in the final regulation"
+
+    - code: |
+        async function evaluateLoanApplication(applicant) {
+          await regkit.disclose({ type: 'ca_admt_notice', purpose: 'loan underwriting' });
+          const decision = await mlModel.predict(applicant.features);
+          if (applicant.optedOutOfADMT) {
+            return await manualUnderwritingReview(applicant);  // genuine alternative path
+          }
+          const finalDecision = await regkit.humanReviewGate({ recommendation: decision });
+          return finalDecision;
+        }
+      config: "risk_assessment_completed: true"
+      reason: "All required elements present, including a genuine alternative path for opt-out"
