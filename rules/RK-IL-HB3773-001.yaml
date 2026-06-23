@@ -1,0 +1,270 @@
+# RegKit Rule: RK-IL-HB3773-001
+# Illinois HB 3773 — IHRA amendment: AI employment discrimination + zip
+# code proxy prohibition + universal AI-use notice
+#
+# Legal basis: Illinois Human Rights Act, Article 5, Section 2, as amended
+# by HB 3773 (signed Aug 9, 2024)
+# Effective: January 1, 2026 — IN EFFECT (statutory obligations active even
+# though implementing notice rules are currently mid-rulemaking, see below)
+#
+# *** THIS RULE IS THE DIRECT, DELIBERATE COUNTERPART TO RK-TX-TRAIGA-001 ***
+#
+# Read RK-TX-TRAIGA-001 alongside this rule. They cover an overlapping fact
+# pattern — AI-driven decisions with disparate impact on a protected class
+# — and reach OPPOSITE conclusions about what's required to establish
+# liability:
+#
+#   TEXAS (TRAIGA):    Intent-based. Disparate impact ALONE is explicitly
+#                       insufficient (§552.056(c)). WARN severity in RegKit.
+#   ILLINOIS (HB 3773): Outcome-based, "Evidence First." Disparate impact
+#                       ALONE is sufficient. Intent is NOT a defense.
+#                       BLOCK severity in RegKit.
+#
+# A rule engine that applied one harmonized "AI discrimination" standard
+# across both states would get at least one of them wrong on every shared
+# fact pattern. This pair of rules is RegKit's clearest, most concrete proof
+# that jurisdiction-aware legal reasoning — not jurisdiction-aware penalty
+# lookup — is the actual hard problem worth solving.
+
+id: RK-IL-HB3773-001
+name: "AI employment decision uses zip code proxy, or has discriminatory effect, or lacks required AI-use notice"
+severity: BLOCK
+  # BLOCK is correct here — unlike TRAIGA, Illinois imposes STRICT,
+  # outcome-based liability. Proxy presence or disparate impact, once
+  # detected, is sufficient on its own; there is no intent threshold to
+  # clear first, so RegKit does not need to defer to human judgment about
+  # intent the way RK-TX-TRAIGA-001 does for the discrimination prong.
+  # (The notice sub-rule is also BLOCK-eligible, independently, since
+  # notice is required "regardless of whether AI use is discriminatory.")
+
+regulation:
+  framework: "Illinois HB 3773 (IHRA Amendment)"
+  citation: "775 ILCS 5/2-102, as amended by P.A. 103-804 (HB 3773)"
+  effective_date: "January 1, 2026 — statutory obligations active"
+  rulemaking_status: >
+    IDHR published proposed implementing rules ("Subpart J," Title 44 Part
+    2520) on May 15, 2026 with a 45-day comment period (due June 29, 2026)
+    and a June 10, 2026 public hearing — then TEMPORARILY WITHDREW that
+    proposed rulemaking. Per Seyfarth Shaw guidance: "the underlying
+    statutory obligations of HB 3773 have been in effect since January 1,
+    2026, and should not be treated as a pause invitation." RegKit treats
+    the core statutory prohibitions (discriminatory effect, zip code
+    proxy) as fully enforceable now, while treating the SPECIFIC notice
+    mechanics (exact format, timing, delivery method) as still-developing
+    and subject to AGENT-7 monitoring for when rulemaking resumes.
+  enforcement_authority: "Illinois Department of Human Rights (IDHR) — plus a PRIVATE RIGHT OF ACTION exists via the IHRA (unlike Texas TRAIGA, which has none)"
+  penalty_structure: "Actual damages, civil penalties, attorneys' fees, compliance-reporting obligations, and other equitable relief as may be necessary to make the complainant whole"
+  liability_standard: >
+    OUTCOME-BASED / strict liability ("Evidence First"). Disparate impact
+    on a protected class is sufficient on its own to establish a civil
+    rights violation. Employer intent or knowledge is explicitly NOT a
+    defense — this is the inverse of the Texas TRAIGA standard.
+  summary: >
+    It is a civil rights violation under the IHRA for an employer to use
+    AI — with respect to recruitment, hiring, promotion, renewal of
+    employment, selection for training/apprenticeship, discharge,
+    discipline, tenure, or terms/privileges/conditions of employment — that
+    has the EFFECT of subjecting employees to discrimination on the basis
+    of an IHRA-protected class, OR to use zip codes as a proxy for a
+    protected class. Separately and independently, employers must notify
+    employees/applicants whenever AI is used to influence or facilitate
+    any such covered employment decision — this notice duty applies
+    REGARDLESS of whether the AI use is actually discriminatory.
+  protected_classes_under_ihra: >
+    Race, color, religion, sex, national origin, ancestry, age, disability,
+    marital status, sexual orientation, military status, unfavorable
+    discharge from military service, citizenship status, order of
+    protection status — broader than the federal Title VII list.
+
+detection:
+  trigger_conditions_independent_and_separate:
+
+    - rule_branch: "zip_code_proxy_prohibition"
+      severity: BLOCK
+      description: >
+        AI/ML model used in a covered employment decision has a zip code
+        (or directly-derived geographic identifier at zip-code granularity)
+        as a model input feature. Per the statutory text, this is the ONE
+        proxy variable named explicitly — RegKit treats zip code presence
+        in this context as BLOCK-level on its own, full stop, regardless
+        of whether a broader disparate-impact analysis has been run.
+      ast_pattern: >
+        A variable matching zip_code, zipcode, postal_code, zip, or
+        equivalent, flowing as a feature into a model.predict() or
+        model.score() call that is reachable from a function tagged or
+        named in a recruitment/hiring/promotion/discipline/termination
+        context.
+      note: >
+        This is narrower and more mechanical than general proxy-variable
+        detection used elsewhere in RegKit's rule set (e.g. RK-GDPR-022's
+        broader "protected-class proxy" heuristics) — Illinois law names
+        zip code specifically; RegKit does NOT extend this specific
+        BLOCK-on-sight treatment to other geographic variables (e.g. city,
+        county, census tract) absent the statute naming them, per the
+        Seyfarth Shaw observation that "the statutory language appears to
+        encompass only zip codes... employers could potentially use other
+        forms of location data without violating this specific provision."
+        Other geographic proxies still get flagged, but under a different,
+        less mechanical disparate-impact analysis, not this BLOCK-on-sight
+        branch.
+
+    - rule_branch: "discriminatory_effect"
+      severity: BLOCK
+      description: >
+        AI/ML output in a covered employment decision produces a
+        statistically detectable disparate outcome across an IHRA-protected
+        class. Unlike RK-TX-TRAIGA-001's WARN-and-flag-for-review posture,
+        this branch escalates directly to BLOCK once disparate impact is
+        established, because Illinois law does not require an additional
+        intent showing.
+      detection_basis: >
+        RegKit cannot independently RUN the statistical disparate-impact
+        analysis from static code alone (that requires actual outcome data
+        across real candidates, not source code) — this branch fires when
+        (a) a bias audit or fairness-testing artifact already exists in the
+        project (e.g. uploaded audit results, a fairness-testing CI job
+        output) AND shows a disparate outcome, or (b) the code pattern
+        matches a known-high-risk configuration (e.g. an unvalidated model
+        trained on historical hiring data with no fairness constraint
+        layer) which RegKit flags as a likely candidate for a violation,
+        pending the actual audit data. RegKit is explicit about which of
+        these two evidentiary postures applies in the finding message.
+
+    - rule_branch: "universal_ai_use_notice"
+      severity: BLOCK
+      description: >
+        Notice duty triggers on ANY use of AI that influences or
+        facilitates a covered employment decision — independent of and
+        regardless of whether that use is discriminatory or uses a zip
+        code. This is the broadest-reach branch of this rule; it captures
+        far more code than the two branches above.
+      ast_pattern: >
+        ML/AI model output reachable in a function tagged/named in a
+        recruitment/hiring/promotion/training-selection/discharge/
+        discipline/tenure context, with no notice-dispatch function
+        (regkit.disclose() tagged notice_type: "il_aedt") reachable in the
+        same flow.
+      covered_decision_examples_per_idhr_draft_guidance:
+        - "computer-based assessments predicting performance or measuring traits/cultural fit"
+        - "directing job postings/ads to specific groups or populations"
+        - "screening resumes"
+        - "analyzing facial expressions, word choice, or voice during interviews"
+        - "analyzing third-party-acquired candidate data"
+      explicitly_not_requiring_notice:
+        - "AI used solely for non-employment-decision business operations (e.g. generating marketing copy)"
+        - "automated tools that do not influence or facilitate the actual employment decision"
+
+false_positive_guards:
+  - >
+    Does not extend the BLOCK-on-sight zip-code treatment to other
+    geographic variables (city, county, census tract, metro area) — the
+    statute names zip codes specifically. Broader geographic-proxy risk is
+    still flagged, but through a separate, evidence-weighted path, not this
+    mechanical branch.
+  - >
+    The discriminatory_effect branch does not claim to run a statistical
+    disparate-impact analysis from source code — it surfaces existing audit
+    findings when present, or flags structurally high-risk configurations
+    as candidates for review, and says so explicitly rather than presenting
+    either as a definitive finding.
+  - >
+    The universal_ai_use_notice branch does NOT require the AI use to be
+    discriminatory, biased, or even risky in any way — notice is required
+    for completely neutral, well-functioning AI tools too. Do not suppress
+    this finding just because the other two branches pass clean.
+  - >
+    Does not trigger on AI used purely for non-employment business
+    operations (marketing copy generation, general analytics dashboards)
+    per the IDHR draft guidance's explicit carve-out.
+
+message:
+  developer_facing: >
+    This code implements an AI-assisted employment decision in scope under
+    Illinois HB 3773. RegKit found: {findings_summary}. UNLIKE Texas TRAIGA
+    (if you operate in both states, see RK-TX-TRAIGA-001), Illinois law does
+    NOT require proof of discriminatory intent — disparate impact or
+    zip-code-proxy use is sufficient on its own for civil rights liability.
+    Separately, AI-use notice is required for this decision REGARDLESS of
+    whether discrimination exists.
+
+  suggested_fix: >
+    {zip_code_finding}: Remove zip code (or zip-derived) features from this
+    model's inputs entirely — Illinois law treats this as per se
+    problematic in covered employment contexts, not a risk factor to weigh.
+    {discriminatory_effect_finding}: Commission or review existing fairness/
+    bias-audit results for this specific model; if disparate impact is
+    confirmed, remediation is required regardless of intent.
+    {notice_finding}: Implement an AI-use notice to affected employees/
+    applicants before this decision affects them — RegKit can scaffold the
+    dispatch call; exact format/timing specifics remain subject to IDHR's
+    currently-paused rulemaking, so use plain language, multiple workforce
+    languages, and accessible formatting as a conservative baseline pending
+    final rules.
+
+  auto_fix_available: true
+  auto_fix_description: >
+    RegKit can remove/flag zip-code-derived features for manual review
+    (cannot auto-delete a model feature without human confirmation it's
+    safe to retrain without it) and scaffold the regkit.disclose() notice
+    call with the IL-specific tag. The discriminatory-effect branch has no
+    auto-fix — fairness remediation (re-weighting, re-training, feature
+    removal) requires a human decision about acceptable tradeoffs.
+
+evidence_contribution:
+  - document: "Algorithmic Impact Assessment"
+    section: "Illinois zip-code proxy and AI-use notice compliance log"
+  - document: "AI System Data Flow Diagram"
+    section: "Employment-decision AI flagged with IL notice status"
+
+monitoring_note_for_agent_7: >
+  HIGH PRIORITY MONITORING ITEM. Watch ilga.gov and the IDHR website for:
+  (1) resumption of the Subpart J rulemaking (proposed May 15, 2026, then
+  temporarily withdrawn — watch for republication and the eventual 45-day
+  comment window reopening), (2) the specific notice format/timing/delivery
+  rules once finalized — RegKit's notice scaffold should be updated to match
+  exactly once final rules publish, (3) whether the December 2025 federal
+  Executive Order's AI Litigation Task Force targets Illinois the way it
+  targeted Colorado and is reportedly considering for Texas.
+
+test_cases:
+  should_trigger_zip_code_branch:
+    - code: |
+        async function scoreApplicant(applicant) {
+          const features = [applicant.zipCode, applicant.yearsExperience, applicant.education];
+          return await mlModel.predict(features);
+        }
+      jurisdiction: "IL"
+      reason: "Zip code present as direct model input feature in a hiring-context function"
+
+  should_trigger_notice_branch_even_if_clean_otherwise:
+    - code: |
+        async function rankCandidates(candidates) {
+          const scores = await mlModel.scoreResumes(candidates); // no zip code, no known disparate impact
+          return scores.sort((a, b) => b.score - a.score);
+        }
+      config: "no notice_dispatch configured"
+      reason: >
+        Notice is required regardless of discriminatory effect — this
+        triggers even though neither of the other two branches would fire,
+        which is the point: notice is the broadest, most-frequently-
+        triggered branch of this rule.
+
+  should_not_trigger:
+    - code: |
+        async function rankCandidates(candidates) {
+          const scores = await mlModel.scoreResumes(candidates);
+          await regkit.disclose({ type: 'il_aedt', recipients: candidates });
+          return scores.sort((a, b) => b.score - a.score);
+        }
+      config: "no zip code feature, notice dispatched, no known disparate impact audit finding"
+      reason: "All three branches satisfied — zip code absent, notice given, no disparate impact evidence on file"
+
+cross_reference_for_demonstration:
+  see_also: "RK-TX-TRAIGA-001"
+  comparison_value: >
+    Run both rules against the SAME hiring-model code sample with a zip
+    code feature and disparate outcome data. RK-TX-TRAIGA-001 produces a
+    WARN, flagged for human/legal review of intent. RK-IL-HB3773-001
+    produces a BLOCK, no intent showing required. This is the single
+    clearest demonstration in RegKit's entire rule library of why
+    jurisdiction-aware legal reasoning is structurally necessary.
