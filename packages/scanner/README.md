@@ -62,10 +62,48 @@ automatically satisfy another.
 
 ## Current rule coverage
 
-13 rules loaded from `rules/`. 5 have active AST detectors wired
-(HIPAA, EU AI Act Art. 14, GDPR Art. 22, Illinois BIPA, FCRA/ECOA). The
-remaining 8 are loaded and validated but not yet wired to detector logic
-— next build phase.
+13 rules loaded from `rules/`, **all 13 with active AST detectors wired**
+(HIPAA, EU AI Act Art. 14, GDPR Art. 22, Colorado, Texas, NYC LL144,
+Illinois HB3773, Illinois BIPA, California ADMT, California SB942,
+Washington HB1170, multi-state chatbot, federal FCRA/ECOA).
+
+## AGENT-3 — the legal reasoning second pass
+
+The detectors above are deterministic pattern matchers: fast, free, no API
+calls. They find *candidates*. AGENT-3 is the reasoning layer that reviews
+each candidate and decides whether it's a genuine violation or a false
+positive the pattern matcher couldn't resolve.
+
+Run it with `--reason`:
+
+```bash
+node cli.js scan test-fixtures/patient-risk-assessment-compliant.js --config test-fixtures/regkit.yaml --reason
+```
+
+AGENT-3 annotates each finding with a verdict:
+- **CONFIRMED** — genuine violation, high confidence
+- **NEEDS_HUMAN** — structural pattern present, but final determination
+  depends on a fact not visible in code (e.g. whether human review is
+  "meaningful", or whether a pending law is yet enforceable)
+- **DISMISSED** — false positive, filtered out
+
+### Run modes (automatic)
+
+- **No API key** → deterministic mock reasoning. Runs free, anywhere,
+  produces the same output shape. This is the default so the scanner works
+  for anyone who clones the repo with zero setup.
+- **`ANTHROPIC_API_KEY` set** → genuine Claude legal reasoning per finding,
+  grounded in each rule's own statutory research (citation, summary,
+  false-positive guards from the YAML become the legal context).
+- **API error / rate limit / bad key** → graceful automatic fallback to
+  mock, so a scan never crashes mid-run (critical for CI pipelines).
+
+Flags: `--reason` (enable AGENT-3), `--mock` (force mock even with a key),
+`--all` (keep DISMISSED findings in output).
+
+This two-pass design is also the cost model: deterministic detection runs
+on everything for free; the paid Claude reasoning only ever touches code
+that was already flagged — never clean code.
 
 ## Architecture
 
