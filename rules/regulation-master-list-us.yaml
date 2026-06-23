@@ -1,0 +1,247 @@
+# RegKit Master Regulation List — United States
+# Compiled [current as of search date — AGENT-7 must re-verify before each
+# rule-build session, this landscape moves weekly]
+#
+# Purpose: single source of truth for which rules to build, in what order,
+# and — critically — flagging which ones use CONTRADICTORY legal standards
+# on the same fact pattern, so RegKit's rule engine encodes the differences
+# correctly rather than averaging them into one wrong "discrimination" rule.
+
+# ============================================================================
+# TIER 1 — ACTIVELY ENFORCEABLE RIGHT NOW (build these first)
+# ============================================================================
+
+tier_1_active_enforcement:
+
+  - id: federal-hipaa
+    name: "HIPAA / HITECH"
+    status: "BUILT — RK-HIPAA-001"
+    standard: "vendor-contract-based (BAA requirement)"
+    notes: "2026 Security Rule overhaul adds mandatory MFA + annual risk analysis"
+
+  - id: federal-gdpr-note
+    name: "GDPR (EU, but binds any US company with EU users/data)"
+    status: "BUILT — RK-GDPR-022"
+    standard: "individual-rights-based, 'meaningful' human involvement"
+    notes: "include because most US AI companies have some EU exposure"
+
+  - id: us-eu-ai-act-note
+    name: "EU AI Act (same cross-border logic as GDPR)"
+    status: "BUILT — RK-EUAI-014"
+    standard: "design-requirement-based, proportionate to risk/volume"
+
+  - id: tx-traiga
+    name: "Texas TRAIGA (HB 149)"
+    status: "BUILT — RK-TX-TRAIGA-001"
+    standard: "INTENT-BASED — disparate impact alone is explicitly insufficient (§552.056(c))"
+    effective: "January 1, 2026 — currently enforceable, not stayed"
+    affirmative_defense: "NIST AI RMF substantial compliance (§552.105)"
+
+  - id: nyc-ll144
+    name: "NYC Local Law 144 (AEDT bias audit)"
+    status: "BUILT — RK-NYC-LL144-001"
+    standard: "procedural/transparency only — audit + notice, NOT a discrimination prohibition itself"
+    effective: "enforcing since July 5, 2023"
+    enforcement_trend: "escalating in 2026 after critical Dec 2025 Comptroller audit"
+
+  - id: co-sb26-189
+    name: "Colorado SB 26-189 (ADMT — replaced SB 24-205)"
+    status: "BUILT — RK-CO-ADMT-001"
+    standard: "notice-and-transparency, NOT risk-classification-based (old framework repealed)"
+    effective: "January 1, 2027 — enforcement pending AG rulemaking, currently a forward-looking WARN"
+    important: "SB 24-205 (old 'Colorado AI Act') is DEAD — do not build rules citing it"
+
+  - id: il-hb3773
+    name: "Illinois HB 3773 (IHRA amendment — AI employment discrimination)"
+    status: "TO BUILD NEXT"
+    standard: >
+      OUTCOME-BASED / strict liability — "Evidence First" rule. Disparate
+      impact ALONE is sufficient for liability; intent is NOT a defense.
+      THIS IS THE DIRECT OPPOSITE STANDARD FROM TEXAS TRAIGA ON THE SAME
+      FACT PATTERN. A rule engine must NOT apply one harmonized standard.
+    effective: "January 1, 2026 — in effect"
+    specific_prohibition: "explicitly bans zip code as a proxy variable — name the prohibition in the rule, not just generic 'proxy detection'"
+    notice_requirement: "required regardless of whether AI use is discriminatory — broader trigger than the discrimination prohibition itself"
+    enforcement: "Illinois Department of Human Rights + private right of action via IHRA"
+    priority: HIGH — directly contradicts TX rule, high pedagogical/marketing value to show side by side
+
+  - id: il-bipa
+    name: "Illinois BIPA (biometric privacy)"
+    status: "referenced inside RK-EUAI-014/RK-NYC context but not yet a standalone rule"
+    standard: "consent-based, strict liability per violation"
+    priority: MEDIUM — already partially covered, consider standalone rule for completeness
+
+  - id: il-aivia
+    name: "Illinois AI Video Interview Act (AIVIA)"
+    status: "NOT YET BUILT"
+    standard: "consent + notice + data destruction, narrower scope than BIPA"
+    priority: LOW — narrow use case (video interview analysis specifically)
+
+  - id: ut-ai-policy-act
+    name: "Utah Artificial Intelligence Policy Act (SB 149)"
+    status: "NOT YET BUILT"
+    standard: "disclosure-based — must clearly disclose GenAI interaction to consumers"
+    penalty: "$2,500 per violation (administrative fine)"
+    enforcement: "Utah Division of Consumer Protection — 'remains limited to date' per sources"
+    note: "SB 226 and SB 332 narrowed scope to 'clear and unambiguous' requests or high-risk/sensitive-data interactions — use NARROWED scope, not original broad draft"
+    priority: MEDIUM — one of the "five states that matter" per multiple trackers
+
+  - id: ca-sb942
+    name: "California AI Transparency Act (SB 942, as amended by AB 853)"
+    status: "NOT YET BUILT"
+    standard: "content-provenance/watermarking for generative AI outputs"
+    effective: "August 2, 2026 (delayed from Jan 1, 2026 — deliberately aligned with EU AI Act Art. 50 timeline)"
+    threshold: ">1,000,000 monthly visitors/users, publicly accessible in CA"
+    penalty: "$5,000 per violation PER DAY — can compound to $150K/month for one deficiency"
+    additional_dates: "Jan 1 2027 — large online platforms; Jan 1 2028 — capture device manufacturers"
+    priority: HIGH — large penalty exposure, clear technical trigger (image/video/audio gen output)
+
+  - id: ca-ab2013
+    name: "California AB 2013 (Generative AI Training Data Transparency Act)"
+    status: "NOT YET BUILT"
+    standard: "disclosure of training data summary on developer's website"
+    effective: "January 1, 2026 — in effect"
+    priority: MEDIUM — applies to model developers, not most app-layer companies RegKit's early customers will be
+
+  - id: ca-sb53
+    name: "California SB 53 (Transparency in Frontier AI Act / TFAIA)"
+    status: "NOT YET BUILT"
+    standard: "frontier-model-only — safety framework publication, incident reporting, whistleblower protections"
+    threshold: ">10^26 FLOPS training compute AND (for enhanced obligations) >$500M annual revenue"
+    effective: "January 1, 2026"
+    penalty: "up to $1,000,000 per violation"
+    priority: LOW for RegKit's near-term customers — targets frontier labs (OpenAI/Anthropic/Google scale), not RegKit's app-layer customer base. Build later for completeness/credibility, not urgency.
+
+  - id: ca-admt-cppa
+    name: "California CCPA Automated Decision-Making Technology (ADMT) regulations"
+    status: "NOT YET BUILT — HIGH VALUE"
+    standard: "pre-use notice + consumer rights (access, opt-out) for significant automated decisions"
+    effective: "January 1, 2026 for new systems; full provisions phasing through January 2027"
+    definition: "functional, not technology-specific — any computation that replaces or SUBSTANTIALLY REPLACES human decision-making"
+    enforcement: "California Privacy Protection Agency (CPPA)"
+    priority: HIGH — broad applicability, similar shape to GDPR Art. 22 but distinct CA-specific notice content requirements; good candidate for next build given breadth
+
+  - id: ca-ab489
+    name: "California AB 489 (Health Care AI licensure/disclosure)"
+    status: "NOT YET BUILT"
+    standard: "prohibits AI from falsely claiming healthcare licensure; requires disclosure when AI communicates with patients"
+    priority: MEDIUM — healthcare vertical fit, pairs well with HIPAA rule pack
+
+  - id: ca-sb243
+    name: "California SB 243 (Companion Chatbots Act)"
+    status: "NOT YET BUILT"
+    standard: "chatbot disclosure + safety protocols for self-harm content + minor protections (content limits, break reminders)"
+    priority: MEDIUM — relevant for any consumer chatbot product, growing multi-state pattern (see chatbot cluster below)
+
+
+# ============================================================================
+# TIER 2 — EFFECTIVE BUT ENFORCEMENT STILL MATURING / NARROWER SCOPE
+# ============================================================================
+
+tier_2_maturing:
+
+  - id: ny-raise-act
+    name: "New York RAISE Act (frontier model safety)"
+    status: "NOT YET BUILT"
+    standard: "frontier-model-only, mirrors CA TFAIA per legislative intent"
+    effective: "January 1, 2027"
+    notes: "Hochul signed initial law Dec 2025, chapter amendments March 27 2026 aligned it to TFAIA"
+    priority: LOW — same audience problem as CA SB 53
+
+  - id: ny-election-deepfake
+    name: "New York election-deepfake law"
+    status: "NOT YET BUILT"
+    standard: "restricts AI-generated political ads within 60 days of an election"
+    priority: LOW — narrow, seasonal/political use case, low fit for typical RegKit customer
+
+  - id: chatbot-disclosure-cluster
+    name: "Multi-state chatbot disclosure laws: Oregon, Idaho, Iowa, Nebraska, Maine, Georgia + Washington HB 1170"
+    status: "NOT YET BUILT — CONSIDER AS ONE COMBINED RULE"
+    standard: "consumer-facing chatbot must disclose it is AI when asked, or per specific state trigger conditions"
+    priority: HIGH for breadth — "if your product has a chat interface" is a near-universal RegKit customer fit; one rule with state-by-state trigger logic is more efficient than 7 near-identical rules
+    build_note: "Build as ONE rule file with a per-state trigger-condition table, not 7 separate files — the underlying obligation (disclose AI) is nearly identical, only the precise trigger and penalty differ"
+
+  - id: missouri-sb1019
+    name: "Missouri SB 1019 (AI therapy chatbot prohibition)"
+    status: "NOT YET BUILT"
+    standard: "prohibits offering AI therapy chatbots outright (not just disclosure)"
+    effective: "August 28, 2026"
+    priority: MEDIUM — relevant if any customer is in mental-health-adjacent chatbot space; rare but severe (prohibition, not just disclosure)
+
+
+# ============================================================================
+# TIER 3 — VOLUNTARY / CROSS-CUTTING / SAFE-HARBOR FRAMEWORKS
+# (already partially built — these are referenced inside Tier 1 rules
+#  rather than standalone, since their value is as a DEFENSE, not a rule)
+# ============================================================================
+
+tier_3_frameworks:
+  - id: nist-ai-rmf
+    status: "Referenced inside RK-TX-TRAIGA-001 as affirmative defense — sufficient for now"
+  - id: iso-42001
+    status: "Not yet built — lower priority, certification-based not code-detectable"
+
+
+# ============================================================================
+# EXPLICITLY DEAD / DO NOT BUILD — these appear in older sources and search
+# results but are no longer good law. Listed here specifically so nobody
+# (human or AGENT-7) accidentally builds a rule citing them.
+# ============================================================================
+
+explicitly_dead_do_not_build:
+  - id: co-sb24-205
+    name: "Colorado SB 24-205 (original 'Colorado AI Act')"
+    status: "REPEALED before ever taking effect. Replaced by SB 26-189."
+    why_it_keeps_appearing: "Most blog content and even some compliance vendor marketing still describes this as current law — it is not. Always verify against SB 26-189 instead."
+
+  - id: ca-sb942-jan2026-date
+    name: "California SB 942 original January 1, 2026 effective date"
+    status: "SUPERSEDED — AB 853 delayed it to August 2, 2026"
+    why_it_keeps_appearing: "Many 2025-era sources still cite the original date"
+
+
+# ============================================================================
+# CROSS-JURISDICTION CONFLICT TABLE — the single most valuable artifact
+# in this document for demonstrating RegKit's actual technical differentiator
+# ============================================================================
+
+conflicting_standards_same_fact_pattern:
+  scenario: "AI model uses zip code as an input feature; disparate impact results for a protected class; no proof of discriminatory intent exists"
+
+  outcomes_by_jurisdiction:
+    - jurisdiction: "Texas (TRAIGA)"
+      outcome: "NOT independently sufficient for liability — intent must be separately shown (§552.056(c))"
+      rule_ref: "RK-TX-TRAIGA-001 → WARN severity, flagged for human review"
+
+    - jurisdiction: "Illinois (HB 3773)"
+      outcome: "SUFFICIENT for liability on its own — explicit zip-code prohibition, outcome-based, intent is not a defense"
+      rule_ref: "RK-IL-HB3773-001 → should be BLOCK severity (to build)"
+
+    - jurisdiction: "GDPR (Art. 22, if EU data subject)"
+      outcome: "Relevant to whether decision is 'solely automated' with 'significant effect' — separate analytical question from discrimination per se, but proxy presence raises Art. 9/22(4) special-category concerns"
+      rule_ref: "RK-GDPR-022 → BLOCK or WARN depending on human-review presence"
+
+    - jurisdiction: "Colorado (SB 26-189, current law)"
+      outcome: "Not directly addressed — old SB 24-205's standalone 'duty to avoid algorithmic discrimination' was REMOVED in the rewrite; current law focuses on notice/explanation, not discrimination prevention per se"
+      rule_ref: "RK-CO-ADMT-001 → not the primary trigger under current law"
+
+  why_this_matters_for_the_pitch: >
+    This is the single clearest, most concrete proof that "one AI compliance
+    rule" is structurally impossible to build correctly. The exact same
+    code, the exact same fact pattern, produces a BLOCK in Illinois, a WARN
+    in Texas, a conditional finding under GDPR, and effectively no finding
+    under current Colorado law. Any tool that doesn't encode jurisdiction-
+    specific legal standards — not just jurisdiction-specific PENALTIES —
+    will systematically misinform developers in at least 3 of these 4
+    jurisdictions on this single fact pattern.
+
+
+# ============================================================================
+# RECOMMENDED BUILD ORDER (next 4 rules)
+# ============================================================================
+
+next_build_order:
+  1: "il-hb3773 — highest pedagogical value, directly contradicts TX rule already built"
+  2: "ca-admt-cppa — broadest applicability, similar shape to GDPR Art. 22 but CA-specific"
+  3: "ca-sb942 — large penalty exposure ($5K/day), clean technical trigger (genAI media output)"
+  4: "chatbot-disclosure-cluster — near-universal customer fit, build as one multi-state rule file"
