@@ -1,0 +1,209 @@
+# RegKit Rule: RK-NYC-LL144-001
+# NYC Local Law 144 — Automated Employment Decision Tool (AEDT) bias audit
+# and candidate notice requirements
+#
+# Legal basis: NYC Admin. Code § 20-870 et seq. (Local Law 144 of 2021)
+# Effective: January 1, 2023 | Enforced since: July 5, 2023 — ACTIVELY
+# ENFORCING with a documented 2026 enforcement escalation (see below)
+#
+# CRITICAL FRAMING — different in kind from every other rule in this set:
+# Local Law 144 is a PURE PROCEDURAL/TRANSPARENCY law. It does not itself
+# prohibit AI hiring discrimination — it requires audit + disclosure.
+# Per official DCWP guidance: "DCWP enforces the Law's prohibition on AEDT
+# use without a bias audit and required notices. Claims of discrimination
+# involving AEDT use should go to the NYC Commission on Human Rights, which
+# enforces the NYC Human Rights Law" — a SEPARATE statute. This means a
+# company can be fully compliant with LL144 (audit done, notice given,
+# results published) while still facing a discrimination claim under the
+# NYC Human Rights Law for the SAME tool. RegKit treats these as two
+# independent compliance surfaces, not one combined "AI hiring bias" rule.
+#
+# ALSO NOTE: extraterritorial reach. The law applies based on candidate
+# residence, not employer location — any employer evaluating a NYC resident
+# is in scope regardless of where the company is headquartered.
+
+id: RK-NYC-LL144-001
+name: "Automated Employment Decision Tool used without current bias audit, public disclosure, or candidate notice"
+severity: BLOCK
+  # BLOCK is appropriate here, unlike the WARN posture in RK-TX-TRAIGA-001
+  # and RK-CO-ADMT-001 — this law IS actively, currently enforced (since
+  # July 2023), is NOT under any litigation stay, and per recent reporting
+  # enforcement is escalating in 2026, not winding down.
+
+regulation:
+  framework: "NYC Local Law 144"
+  citation: "NYC Admin. Code § 20-870 et seq.; implementing rules at 6 RCNY § 5-300 et seq."
+  effective_date: "January 1, 2023"
+  enforcement_began: "July 5, 2023"
+  enforcement_authority: "NYC Department of Consumer and Worker Protection (DCWP) — for audit/notice violations only. NYC Commission on Human Rights — for discrimination claims under NYC Human Rights Law (separate statute)."
+  penalty_structure: "$500 for first violation; $500–$1,500 per day for continuing violations"
+  enforcement_trend: >
+    A December 2025 NYS Comptroller audit found DCWP's enforcement process
+    largely ineffective to date (surveyed 32 companies, found only 1
+    non-compliance issue despite widespread AEDT adoption, and identified
+    a broken complaint-routing process). Major employment law firms are
+    warning of a stricter 2026 enforcement phase with more frequent
+    investigations following this audit's findings — AGENT-7 should treat
+    this as a signal that enforcement intensity is about to increase, not
+    a signal that the law lacks teeth.
+  summary: >
+    Employers and employment agencies are prohibited from using an AEDT to
+    evaluate a candidate or employee who resides in New York City unless:
+    (1) the AEDT has been the subject of a bias audit conducted no more
+    than one year prior to its use, (2) a summary of the most recent bias
+    audit results is publicly posted on the employer's website, and
+    (3) the candidate/employee has been given notice — at least 10 business
+    days before use — that an AEDT will be used, what it assesses, and how
+    to request an alternative process or accommodation.
+
+what_counts_as_aedt:
+  definition: >
+    Any computational process derived from machine learning, statistical
+    modeling, data analytics, or AI that issues a "simplified output"
+    (a score, classification, or recommendation) used to SUBSTANTIALLY
+    ASSIST OR REPLACE discretionary decision-making in hiring or promotion.
+  in_scope_examples:
+    - "resume screening / parsing tools that produce a rank or score"
+    - "chatbot-based candidate assessment"
+    - "video interview analytics producing a fit/suitability score"
+    - "algorithmic candidate ranking systems"
+  explicitly_excluded:
+    - "tools that merely transcribe or translate (e.g. converting a PDF resume to text) without producing a simplified output used in decisioning — NOTE: dissenting commentary argues transcription bias still warrants scrutiny, but the adopted rule text excludes pure transcription"
+    - "use on internal candidates not applying for a specific posted position (no application submitted)"
+    - "tools used at a weighting/substantiality level the final rule did not capture — RegKit flags borderline cases as INFO rather than guessing"
+
+detection:
+  trigger_conditions:
+    - description: >
+        Code path identified as an AEDT (ML/statistical/AI scoring,
+        ranking, or classification function) feeding into a hiring or
+        promotion decision, where the candidate/employee pool includes or
+        may include NYC residents (default: assume yes unless regkit.yaml
+        explicitly scopes jurisdiction away from NYC, which is difficult to
+        guarantee for remote postings — RegKit defaults conservative).
+      ast_pattern: >
+        ML/AI model output assigned to a variable later used to rank, score,
+        filter, or recommend candidates in a function/module tagged or
+        named in a hiring/recruiting/ATS context.
+
+  required_elements_checked:
+    - element: "current bias audit (within 1 year)"
+      check: >
+        regkit.yaml field `aedt_bias_audit.last_completed_date` exists and
+        is dated within 365 days of the most recent deploy/scan date.
+        RegKit cannot perform the audit itself — this requires an
+        independent third-party auditor per the statute — but tracks the
+        date and flags expiration proactively (30/60/90-day warnings before
+        the one-year mark lapses).
+    - element: "public disclosure of audit summary"
+      check: >
+        regkit.yaml field `aedt_bias_audit.public_summary_url` is populated
+        and (where feasible) RegKit can verify the URL resolves and contains
+        audit-summary-shaped content (selection rates, impact ratios) —
+        best-effort verification, not a legal sufficiency determination.
+    - element: "candidate notice ≥10 business days before use"
+      ast_pattern: >
+        A notice-dispatch function (regkit.disclose() or equivalent,
+        tagged `notice_type: aedt`) reachable in the candidate evaluation
+        flow, with a timing check against the evaluation date where
+        determinable from code (e.g. a scheduled job delay, a database
+        timestamp comparison).
+
+  intersectional_audit_quality_note:
+    description: >
+      RegKit does not grade the STATISTICAL QUALITY of a bias audit (e.g.
+      whether intersectional sex-by-race cross-tabs were computed correctly,
+      or whether the four-fifths rule was properly applied) — that is the
+      independent auditor's job, not a code-analysis job. RegKit verifies
+      PRESENCE and CURRENCY of a qualifying audit reference, not its
+      statistical adequacy. This is a deliberate scope limit, documented
+      here so the distinction is explicit rather than implied.
+
+false_positive_guards:
+  - >
+    Does not trigger on tools used only for internal candidates not
+    formally applying for a specific posted position — the law's
+    "candidate" definition requires an actual application.
+  - >
+    Does not trigger on pure transcription/translation tools per the
+    adopted rule text, even though some commentators argue this creates a
+    gap (transcription bias feeding into other AEDTs) — RegKit follows the
+    adopted rule, not advocacy commentary, but logs an INFO note when a
+    transcription tool's output flows into a separate scoring AEDT, since
+    that downstream tool IS in scope.
+  - >
+    A discrimination finding under the NYC Human Rights Law is NOT the same
+    violation as an LL144 audit/notice gap — RegKit does not conflate the
+    two. A tool can pass this rule (audit done, notice given) while a
+    separate proxy-discrimination rule (shared logic with RK-GDPR-022 /
+    fintech proxy detection) independently flags discrimination risk under
+    NYC Human Rights Law or Title VII. Report both findings separately.
+
+message:
+  developer_facing: >
+    This code implements an Automated Employment Decision Tool affecting
+    candidates who may reside in NYC. RegKit found: {missing_elements}.
+    Local Law 144 requires a current (≤1 year) independent bias audit,
+    public posting of the audit summary, and ≥10 business days' candidate
+    notice before use. DCWP enforcement is escalating in 2026 following a
+    critical December 2025 Comptroller audit of past enforcement gaps.
+
+  suggested_fix: >
+    {audit_missing}: Commission an independent bias audit (RegKit cannot
+    perform this — statute requires a qualified independent third party)
+    and record the completion date in regkit.yaml.
+    {disclosure_missing}: Publish the audit summary on your careers/website
+    and record the URL in regkit.yaml.
+    {notice_missing}: Implement a candidate notice dispatch at least 10
+    business days before AEDT evaluation — RegKit can scaffold the
+    regkit.disclose() call and timing check.
+
+  auto_fix_available: true
+  auto_fix_description: >
+    RegKit scaffolds the candidate notice dispatch function and the
+    regkit.yaml audit-tracking fields with automatic 30/60/90-day
+    expiration warnings. RegKit cannot conduct the bias audit itself —
+    that requires engaging an independent auditor, which is an
+    organizational/procurement action, not a code fix.
+
+evidence_contribution:
+  - document: "Algorithmic Impact Assessment"
+    section: "NYC AEDT bias audit tracking and candidate notice log"
+  - document: "AI System Data Flow Diagram"
+    section: "Hiring/promotion AEDT flagged with audit currency status"
+
+monitoring_note_for_agent_7: >
+  Watch nyc.gov/dcwp and rules.cityofnewyork.us for: (1) any rule amendments
+  following the December 2025 Comptroller audit's criticism of DCWP's
+  enforcement process, (2) DCWP enforcement workbook updates referenced in
+  the Comptroller findings, (3) potential clarification on the transcription-
+  tool exclusion that commenters flagged as a gap during rulemaking.
+
+test_cases:
+  should_trigger:
+    - code: |
+        async function rankCandidates(candidates) {
+          const scores = await mlModel.scoreResumes(candidates);
+          return scores.sort((a, b) => b.score - a.score);
+        }
+      config: "no aedt_bias_audit field in regkit.yaml"
+      reason: "AEDT in active hiring use with no audit tracking at all"
+
+  should_not_trigger:
+    - code: |
+        async function rankCandidates(candidates) {
+          const scores = await mlModel.scoreResumes(candidates);
+          return scores.sort((a, b) => b.score - a.score);
+        }
+      config: |
+        aedt_bias_audit:
+          last_completed_date: "2026-02-15"
+          public_summary_url: "https://company.com/careers/aedt-audit-2026"
+        notice_dispatch: "regkit.disclose({ type: 'aedt', leadDays: 10 })"
+      reason: "All three statutory elements present and current"
+
+    - code: |
+        async function transcribeInterviewVideo(videoFile) {
+          return await speechToText.transcribe(videoFile);
+        }
+      reason: "Pure transcription — excluded under the adopted rule text"
