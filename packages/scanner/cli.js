@@ -18,6 +18,7 @@ const chalk = require('chalk');
 const { loadRules, parseSource, findEnclosingFunction } = require('./core');
 const { runDetector } = require('./detectors');
 const { runAgent3 } = require('./agent3');
+const { generateEvidence } = require('./agent5');
 
 function loadProjectConfig(configPath) {
   if (!fs.existsSync(configPath)) {
@@ -164,6 +165,25 @@ async function scan(targetPath, rulesDir, configPath, options = {}) {
   }
   console.log('');
 
+  // ─── AGENT-5 EVIDENCE GENERATION (optional) ───
+  if (options.evidence) {
+    const ruleMapForEvidence = {};
+    for (const r of rules) ruleMapForEvidence[r.id] = r;
+    const scanMeta = { fileCount: files.length, date: new Date().toISOString() };
+    const docs = generateEvidence(options.evidenceTypes, allFindings, ruleMapForEvidence, projectConfig, scanMeta);
+
+    const outDir = options.evidenceDir || path.join(path.dirname(configPath), 'regkit-evidence');
+    if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+
+    console.log(chalk.cyan(`\nAGENT-5: generated ${docs.length} compliance document(s):\n`));
+    for (const doc of docs) {
+      const outPath = path.join(outDir, doc.filename);
+      fs.writeFileSync(outPath, doc.markdown);
+      console.log(`  ${chalk.green('✓')} ${chalk.bold(doc.title)} ${chalk.gray('→ ' + outPath)}`);
+    }
+    console.log('');
+  }
+
   return { findings: allFindings, blockCount, warnCount, infoCount, agent3Mode };
 }
 
@@ -193,6 +213,7 @@ async function main() {
     reason: args.includes('--reason'),       // run AGENT-3 second pass
     forceMock: args.includes('--mock'),      // force mock even if a key exists
     includeAll: args.includes('--all'),      // keep DISMISSED findings in output
+    evidence: args.includes('--evidence'),   // run AGENT-5 document generation
   };
 
   const result = await scan(targetPath, rulesDir, configPath, options);

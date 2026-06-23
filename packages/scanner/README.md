@@ -101,9 +101,45 @@ AGENT-3 annotates each finding with a verdict:
 Flags: `--reason` (enable AGENT-3), `--mock` (force mock even with a key),
 `--all` (keep DISMISSED findings in output).
 
-This two-pass design is also the cost model: deterministic detection runs
-on everything for free; the paid Claude reasoning only ever touches code
-that was already flagged — never clean code.
+## AGENT-5 — the compliance document generator
+
+Run with `--evidence`:
+
+```bash
+node cli.js scan <path> --config <regkit.yaml> --evidence
+```
+
+AGENT-5 takes the scan findings and auto-generates the compliance
+documents regulators and auditors demand, writing them to a
+`regkit-evidence/` folder. MVP generates the two documents fed by the most
+rules:
+
+- **AI System Data Flow Diagram** (fed by 10 of 13 rules, 100% auto) — a
+  GitHub-native Mermaid diagram plus a data-flow inventory table plus the
+  attached compliance obligations with real statutory citations. Answers
+  the first question every auditor asks: what data goes into your AI and
+  where does the output go.
+- **Algorithmic Impact Assessment** (fed by 5 rules, ~60% auto) —
+  auto-fills system description, detected proxy variables, and a
+  jurisdiction-by-jurisdiction obligations table, then explicitly marks the
+  bias-testing-results, mitigation, and sign-off sections as
+  `[HUMAN COMPLETION REQUIRED]`. RegKit cannot run a statistical bias audit
+  from source code (and for NYC LL144 the law requires an *independent*
+  auditor), so it generates the scaffold and is honest about the boundary.
+
+A compliance officer producing either document manually spends days to
+weeks. AGENT-5 generates the draft as a byproduct of a scan that already
+ran. This is RegKit's commercial engine — the feature that converts a free
+install into a paying compliance-officer champion.
+
+## A note on API keys (BYOK)
+
+RegKit uses **bring-your-own-key** for AGENT-3's Claude reasoning. Set
+`ANTHROPIC_API_KEY` and the code snippet goes directly from your machine to
+Anthropic under your own agreement — RegKit's servers are never in the path
+of your proprietary code. For a compliance/security tool, "your code never
+passes through our servers" is a feature, not friction. Without a key, the
+scanner runs fully in mock mode.
 
 ## Architecture
 
