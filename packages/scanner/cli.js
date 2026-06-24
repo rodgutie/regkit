@@ -75,17 +75,19 @@ function printFinding(finding) {
 }
 
 async function scan(targetPath, rulesDir, configPath, options = {}) {
-  console.log(chalk.bold.cyan('\n  RegKit Scan\n'));
+  const log = options.quiet ? () => {} : (...a) => console.log(...a);
+
+  log(chalk.bold.cyan('\n  RegKit Scan\n'));
 
   const rules = loadRules(rulesDir);
-  console.log(chalk.gray(`Loaded ${rules.length} rules from ${rulesDir}`));
+  log(chalk.gray(`Loaded ${rules.length} rules from ${rulesDir}`));
 
   const ruleMap = {};
   for (const r of rules) ruleMap[r.id] = r;
 
   const projectConfig = loadProjectConfig(configPath);
   const files = findSourceFiles(targetPath);
-  console.log(chalk.gray(`Scanning ${files.length} source file(s) in ${targetPath}\n`));
+  log(chalk.gray(`Scanning ${files.length} source file(s) in ${targetPath}\n`));
 
   const allFindings = [];
   const detectorStats = { OK: 0, NO_DETECTOR_WIRED: 0, ERROR: 0 };
@@ -116,7 +118,7 @@ async function scan(targetPath, rulesDir, configPath, options = {}) {
   // ─── AGENT-3 SECOND PASS (optional, only on flagged candidates) ───
   let agent3Mode = null;
   if (options.reason && allFindings.length > 0) {
-    console.log(chalk.cyan(`\nAGENT-3: reasoning over ${allFindings.length} candidate finding(s)...\n`));
+    log(chalk.cyan(`\nAGENT-3: reasoning over ${allFindings.length} candidate finding(s)...\n`));
 
     // Provides the enclosing-function source as context for each finding
     const codeContextFor = (finding) => {
@@ -140,7 +142,7 @@ async function scan(targetPath, rulesDir, configPath, options = {}) {
   const severityOrder = { BLOCK: 0, WARN: 1, INFO: 2 };
   allFindings.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
 
-  for (const finding of allFindings) {
+  if (!options.quiet) for (const finding of allFindings) {
     printFinding(finding);
   }
 
@@ -148,22 +150,22 @@ async function scan(targetPath, rulesDir, configPath, options = {}) {
   const warnCount = allFindings.filter(f => f.severity === 'WARN').length;
   const infoCount = allFindings.filter(f => f.severity === 'INFO').length;
 
-  console.log('\n' + chalk.bold('─'.repeat(60)));
-  console.log(chalk.bold(`\n  Summary: ${chalk.red(blockCount + ' BLOCK')}  ${chalk.yellow(warnCount + ' WARN')}  ${chalk.blue(infoCount + ' INFO')}\n`));
+  log('\n' + chalk.bold('─'.repeat(60)));
+  log(chalk.bold(`\n  Summary: ${chalk.red(blockCount + ' BLOCK')}  ${chalk.yellow(warnCount + ' WARN')}  ${chalk.blue(infoCount + ' INFO')}\n`));
 
   if (agent3Mode) {
     const modeLabel = agent3Mode === 'live'
       ? chalk.cyan('live Claude reasoning')
       : chalk.dim('mock reasoning (set ANTHROPIC_API_KEY for live Claude)');
-    console.log(chalk.gray(`AGENT-3 ran in: `) + modeLabel + '\n');
+    log(chalk.gray(`AGENT-3 ran in: `) + modeLabel + '\n');
   }
 
-  console.log(chalk.gray(`Rules with active detectors: ${wiredRuleIds.size} (${Array.from(wiredRuleIds).join(', ')})`));
+  log(chalk.gray(`Rules with active detectors: ${wiredRuleIds.size} (${Array.from(wiredRuleIds).join(', ')})`));
   if (unwiredRuleIds.size > 0) {
-    console.log(chalk.gray(`Rules loaded but not yet wired to a detector (MVP scope): ${unwiredRuleIds.size}`));
-    console.log(chalk.dim(`  ${Array.from(unwiredRuleIds).join(', ')}`));
+    log(chalk.gray(`Rules loaded but not yet wired to a detector (MVP scope): ${unwiredRuleIds.size}`));
+    log(chalk.dim(`  ${Array.from(unwiredRuleIds).join(', ')}`));
   }
-  console.log('');
+  log('');
 
   // ─── AGENT-5 EVIDENCE GENERATION (optional) ───
   if (options.evidence) {
@@ -175,13 +177,13 @@ async function scan(targetPath, rulesDir, configPath, options = {}) {
     const outDir = options.evidenceDir || path.join(path.dirname(configPath), 'regkit-evidence');
     if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 
-    console.log(chalk.cyan(`\nAGENT-5: generated ${docs.length} compliance document(s):\n`));
+    log(chalk.cyan(`\nAGENT-5: generated ${docs.length} compliance document(s):\n`));
     for (const doc of docs) {
       const outPath = path.join(outDir, doc.filename);
       fs.writeFileSync(outPath, doc.markdown);
-      console.log(`  ${chalk.green('✓')} ${chalk.bold(doc.title)} ${chalk.gray('→ ' + outPath)}`);
+      log(`  ${chalk.green('✓')} ${chalk.bold(doc.title)} ${chalk.gray('→ ' + outPath)}`);
     }
-    console.log('');
+    log('');
   }
 
   return { findings: allFindings, blockCount, warnCount, infoCount, agent3Mode };
@@ -206,19 +208,51 @@ async function main() {
 
   const rulesIdx = args.indexOf('--rules');
   const configIdx = args.indexOf('--config');
+  const formatIdx = args.indexOf('--format');
   const rulesDir = rulesIdx > -1 ? args[rulesIdx + 1] : path.join(__dirname, 'rules');
   const configPath = configIdx > -1 ? args[configIdx + 1] : path.join(path.dirname(targetPath), 'regkit.yaml');
+  const format = formatIdx > -1 ? args[formatIdx + 1] : 'pretty';
 
   const options = {
     reason: args.includes('--reason'),       // run AGENT-3 second pass
     forceMock: args.includes('--mock'),      // force mock even if a key exists
     includeAll: args.includes('--all'),      // keep DISMISSED findings in output
     evidence: args.includes('--evidence'),   // run AGENT-5 document generation
+    quiet: format === 'json',                // suppress pretty output for machine formats
   };
 
   const result = await scan(targetPath, rulesDir, configPath, options);
 
-  // Exit code 1 if any BLOCK findings — this is what makes the PR gate work later
+  // Machine-readable output for the GitHub Action / CI integrations
+  if (format === 'json') {
+    const json = {
+      summary: {
+        block: result.blockCount,
+        warn: result.warnCount,
+        info: result.infoCount,
+        passed: result.blockCount === 0,
+      },
+      agent3Mode: result.agent3Mode || null,
+      findings: result.findings.map(f => ({
+        ruleId: f.ruleId,
+        ruleName: f.ruleName,
+        severity: f.severity,
+        file: f.file,
+        line: f.line,
+        function: f.functionName,
+        detail: f.detail || null,
+        citation: f.citation || null,
+        agent3: f.agent3 ? {
+          verdict: f.agent3.verdict,
+          confidence: f.agent3.confidence,
+          reasoning: f.agent3.reasoning,
+        } : null,
+      })),
+    };
+    process.stdout.write(JSON.stringify(json, null, 2) + '\n');
+  }
+
+  // Exit code 1 if any BLOCK findings — this is what makes the PR gate work
   process.exit(result.blockCount > 0 ? 1 : 0);
 }
 

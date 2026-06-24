@@ -132,6 +132,57 @@ weeks. AGENT-5 generates the draft as a byproduct of a scan that already
 ran. This is RegKit's commercial engine — the feature that converts a free
 install into a paying compliance-officer champion.
 
+## GitHub Action — the PR compliance gate
+
+RegKit ships as a GitHub Action that runs on every pull request, posts a
+compliance report as a PR comment, and **blocks the merge** if any BLOCK
+findings are present.
+
+To enable it in any repo, drop this into `.github/workflows/regkit.yml`
+(full example in `.github-workflow-example/regkit.yml`):
+
+```yaml
+name: RegKit Compliance
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  compliance-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rodgutie/regkit@main
+        with:
+          reason: 'true'
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}  # optional BYOK
+```
+
+How it works:
+- `cli.js ... --format json` emits machine-readable findings.
+- `action/post-comment.js` formats them into a PR comment and posts via the
+  GitHub token GitHub injects automatically (no third-party action, no extra
+  dependency).
+- The scanner exits 1 on BLOCK findings → the check fails → the merge is
+  blocked. Clean code exits 0 → merge proceeds.
+
+The Anthropic key (for live AGENT-3 reasoning) is provided as a repo secret
+and passed straight to Anthropic — BYOK, never through RegKit's servers.
+Without it, the gate still runs with AGENT-3 in mock mode.
+
+### JSON output mode
+
+For any CI integration beyond the bundled Action:
+
+```bash
+node cli.js scan <path> --config <regkit.yaml> --format json
+```
+
+Emits `{ summary: {block,warn,info,passed}, agent3Mode, findings: [...] }`
+with no console noise, suitable for piping into other tools.
+
 ## A note on API keys (BYOK)
 
 RegKit uses **bring-your-own-key** for AGENT-3's Claude reasoning. Set

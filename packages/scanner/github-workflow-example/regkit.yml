@@ -1,0 +1,45 @@
+# RegKit AI Compliance Gate
+#
+# Drop this file into your repo at .github/workflows/regkit.yml
+# It runs RegKit on every pull request and blocks the merge if any
+# BLOCKING AI-compliance violations are found, posting a detailed report
+# as a PR comment.
+#
+# To enable live AGENT-3 legal reasoning (Claude), add your Anthropic API
+# key as a repo secret named ANTHROPIC_API_KEY (Settings → Secrets and
+# variables → Actions). Without it, RegKit still runs — AGENT-3 just uses
+# mock reasoning. Your code is sent directly to Anthropic under your own
+# key (BYOK); it never passes through RegKit's servers.
+
+name: RegKit Compliance
+
+on:
+  pull_request:
+    branches: [main, master]
+    # Only run when source files actually change
+    paths:
+      - '**.js'
+      - '**.ts'
+      - '**.jsx'
+      - '**.tsx'
+      - 'regkit.yaml'
+
+permissions:
+  contents: read
+  pull-requests: write   # needed to post the compliance report comment
+
+jobs:
+  compliance-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: RegKit AI Compliance Gate
+        uses: rodgutie/regkit@main
+        with:
+          path: '.'
+          config: 'regkit.yaml'
+          reason: 'true'                                   # enable AGENT-3 legal reasoning
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}  # optional — BYOK
+          fail_on_block: 'true'                            # block the PR on BLOCK findings

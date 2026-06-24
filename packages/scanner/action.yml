@@ -1,0 +1,64 @@
+name: 'RegKit AI Compliance Gate'
+description: 'Scans changed code for AI regulation violations and blocks the PR on blocking findings.'
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  path:
+    description: 'File or directory to scan'
+    required: false
+    default: '.'
+  config:
+    description: 'Path to regkit.yaml project config'
+    required: false
+    default: 'regkit.yaml'
+  reason:
+    description: 'Enable AGENT-3 legal reasoning second pass (requires ANTHROPIC_API_KEY for live mode)'
+    required: false
+    default: 'false'
+  anthropic_api_key:
+    description: 'Anthropic API key for live AGENT-3 reasoning (BYOK). Optional — without it, AGENT-3 runs in mock mode.'
+    required: false
+    default: ''
+  fail_on_block:
+    description: 'Whether BLOCK findings should fail the check (block the PR)'
+    required: false
+    default: 'true'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install RegKit scanner dependencies
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: npm install --omit=dev
+
+    - name: Run RegKit scan
+      id: scan
+      shell: bash
+      env:
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic_api_key }}
+      run: |
+        REASON_FLAG=""
+        if [ "${{ inputs.reason }}" = "true" ]; then REASON_FLAG="--reason"; fi
+        node "${{ github.action_path }}/cli.js" scan "${{ inputs.path }}" \
+          --config "${{ inputs.config }}" \
+          --rules "${{ github.action_path }}/rules" \
+          $REASON_FLAG \
+          --format json > "${{ runner.temp }}/regkit-result.json" || true
+        echo "result_file=${{ runner.temp }}/regkit-result.json" >> "$GITHUB_OUTPUT"
+
+    - name: Post compliance report to PR
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        REGKIT_RESULT_FILE: ${{ steps.scan.outputs.result_file }}
+        REGKIT_FAIL_ON_BLOCK: ${{ inputs.fail_on_block }}
+      run: |
+        node "${{ github.action_path }}/action/post-comment.js"
