@@ -1,6 +1,6 @@
 RegKit
 
-Compliance-native AI development. RegKit catches EU AI Act, HIPAA, GDPR, and 40+ regulatory violations in your code — before it ships.
+Compliance-native AI development. RegKit catches EU AI Act, HIPAA, GDPR, and other AI compliance violations in your code — before it ships. 13 regulations across federal, European Union, and 7 US jurisdictions, each grounded in actual statutory text — including cases where the same code is legal in one US state and illegal in another.
 
 Think spell-check, but for the law.
 
