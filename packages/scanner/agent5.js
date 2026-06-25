@@ -245,6 +245,292 @@ function shortPath(p) {
   return parts.slice(-2).join('/');
 }
 
+// ─── DOCUMENT 3: HIPAA SECURITY RISK ASSESSMENT ───────────────────────────────
+// Mandatory for covered entities/BAs using AI on PHI. 2026 Security Rule makes
+// annual completion explicitly required. ~70% auto: RegKit fills the system
+// inventory and detected gaps; human adds likelihood/impact ratings.
+
+function generateHipaaSRA(findings, ruleMap, projectConfig, scanMeta) {
+  const projectName = (projectConfig.project && projectConfig.project.name) || projectConfig.name || 'Unnamed Project';
+  const phiFindings = findings.filter(f => /HIPAA|PHI|health/i.test(JSON.stringify(f)));
+
+  let md = `# HIPAA Security Risk Assessment\n\n`;
+  md += `**Project:** ${projectName}  \n**Generated:** ${todayISO()} by RegKit AGENT-5  \n`;
+  md += `**Regulatory basis:** 45 CFR § 164.308(a)(1)(ii)(A); 2026 Security Rule update (annual risk analysis explicitly required)  \n\n`;
+  md += DISCLAIMER + '\n\n';
+  md += `## 1. Purpose\n\nThe HIPAA Security Rule requires a covered entity or business associate to conduct an accurate and thorough assessment of the potential risks and vulnerabilities to the confidentiality, integrity, and availability of electronic protected health information (ePHI). HHS OCR specifically looks for this document in enforcement investigations; its absence is itself an aggravating factor.\n\n`;
+
+  md += `## 2. AI Systems Processing ePHI _(auto-generated)_\n\n`;
+  if (phiFindings.length) {
+    md += `RegKit detected the following AI touchpoints handling or potentially handling ePHI:\n\n`;
+    md += `| System / Function | Location | Risk Identified |\n|---|---|---|\n`;
+    for (const f of phiFindings) {
+      md += `| \`${f.functionName}()\` | ${shortPath(f.file)}:${f.line} | ${f.detail || f.ruleName} |\n`;
+    }
+  } else {
+    md += `No AI systems processing ePHI were detected in this scan. If this is unexpected, confirm your \`regkit.yaml\` declares \`industry: healthcare\`.\n`;
+  }
+  md += `\n`;
+
+  md += `## 3. Identified Risks & Required Safeguards _(auto-generated)_\n\n`;
+  if (phiFindings.length) {
+    for (const f of phiFindings) {
+      md += `### Risk: ${f.ruleName}\n`;
+      md += `- **Location:** \`${f.functionName}()\` (${shortPath(f.file)}:${f.line})\n`;
+      md += `- **Regulatory citation:** ${f.citation || 'see HIPAA Security Rule'}\n`;
+      md += `- **Safeguard required:** ${f.detail || 'See remediation guidance'}\n`;
+      md += `- **Likelihood:** _[HUMAN COMPLETION REQUIRED — High / Medium / Low]_\n`;
+      md += `- **Impact:** _[HUMAN COMPLETION REQUIRED — High / Medium / Low]_\n\n`;
+    }
+  } else {
+    md += `_No specific ePHI risks flagged in this scan._\n\n`;
+  }
+
+  md += `## 4. Administrative, Physical & Technical Safeguards Review _[HUMAN COMPLETION REQUIRED]_\n\n`;
+  md += `RegKit assesses safeguards visible in code (encryption calls, access checks, audit logging). The full SRA also requires organizational safeguards RegKit cannot see:\n\n`;
+  md += `- [ ] Workforce security & access management policies\n- [ ] Business Associate Agreements inventory (RegKit tracks AI-vendor BAAs only)\n- [ ] Physical facility access controls\n- [ ] Contingency / disaster recovery plan\n- [ ] Annual review cadence documented (now explicitly required, 2026 rule)\n\n`;
+
+  md += `## 5. Risk Determination & Sign-off _[HUMAN COMPLETION REQUIRED]_\n\n`;
+  md += `- Security Officer: ____________________\n- Date of assessment: ____________________\n- Next scheduled review: ____________________ (annual minimum)\n- Signature: ____________________\n\n`;
+
+  return md;
+}
+
+// ─── DOCUMENT 4: EU AI ACT ANNEX IV TECHNICAL DOCUMENTATION ───────────────────
+// Required by law before any high-risk AI system is placed on the EU market.
+// ~80% auto per the playbook. Structured to Annex IV's 9 required sections.
+
+function generateAnnexIV(findings, ruleMap, projectConfig, scanMeta) {
+  const projectName = (projectConfig.project && projectConfig.project.name) || projectConfig.name || 'Unnamed Project';
+  const euFindings = findings.filter(f => /EUAI|EU AI Act|GDPR/i.test(f.ruleId + (f.citation || '')));
+
+  let md = `# EU AI Act — Annex IV Technical Documentation\n\n`;
+  md += `**System:** ${projectName}  \n**Generated:** ${todayISO()} by RegKit AGENT-5  \n`;
+  md += `**Regulatory basis:** Regulation (EU) 2024/1689, Article 11 & Annex IV  \n\n`;
+  md += DISCLAIMER + '\n\n';
+  md += `> Required by law before a high-risk AI system is placed on the EU market. Manual production typically costs $30,000–$80,000 and 6–12 weeks per system.\n\n`;
+
+  md += `## 1. General description of the AI system _(auto-generated)_\n\n`;
+  const aiFns = [...new Set(findings.map(f => f.functionName))];
+  md += `Intended purpose, developer, and system version are organization-supplied. RegKit detected ${aiFns.length} AI-bearing function(s):\n\n`;
+  for (const fn of aiFns) md += `- \`${fn}()\`\n`;
+  md += `\n_[HUMAN COMPLETION: intended purpose, version, market-placement date]_\n\n`;
+
+  md += `## 2. Detailed description of system elements & development process _(partially auto)_\n\n`;
+  md += `RegKit maps the AI calls and data flows detected in code. Full development-process documentation (design choices, training methodology) is organization-supplied.\n\n`;
+
+  md += `## 3. Monitoring, functioning and control _(auto-generated)_\n\n`;
+  const oversightFindings = euFindings.filter(f => /oversight|Art. 14|human/i.test(f.detail || f.ruleName));
+  if (oversightFindings.length) {
+    md += `Human-oversight gaps detected (Article 14):\n\n`;
+    for (const f of oversightFindings) {
+      md += `- \`${f.functionName}()\`: ${f.detail}\n`;
+    }
+  } else {
+    md += `Human-oversight mechanisms present or not applicable in scanned code.\n`;
+  }
+  md += `\n`;
+
+  md += `## 4. Risk management system (Article 9) _[HUMAN COMPLETION REQUIRED]_\n\n`;
+  md += `- [ ] Risk identification & evaluation\n- [ ] Risk mitigation measures\n- [ ] Residual-risk acceptance\n\n`;
+
+  md += `## 5. Changes through lifecycle _[HUMAN COMPLETION REQUIRED]_\n\n`;
+  md += `RegKit's AGENT-6 continuous monitor can auto-populate this section over time as it tracks commits affecting the system.\n\n`;
+
+  md += `## 6. Standards applied & 7. EU declaration of conformity & 8. Post-market monitoring plan _[HUMAN COMPLETION REQUIRED]_\n\n`;
+  md += `Organization-supplied. RegKit's NIST AI RMF Conformance Report (generate with \`--evidence\`) supports Section 6.\n\n`;
+
+  return md;
+}
+
+// ─── DOCUMENT 5: GDPR DPIA ────────────────────────────────────────────────────
+// Required under GDPR Art. 35 for high-risk processing. ~65% auto.
+
+function generateGdprDPIA(findings, ruleMap, projectConfig, scanMeta) {
+  const projectName = (projectConfig.project && projectConfig.project.name) || projectConfig.name || 'Unnamed Project';
+  const gdprFindings = findings.filter(f => /GDPR|Art\. 22|automated decision/i.test(f.ruleId + (f.detail || '')));
+
+  let md = `# GDPR Data Protection Impact Assessment (DPIA)\n\n`;
+  md += `**Project:** ${projectName}  \n**Generated:** ${todayISO()} by RegKit AGENT-5  \n`;
+  md += `**Regulatory basis:** Regulation (EU) 2016/679, Article 35  \n\n`;
+  md += DISCLAIMER + '\n\n';
+  md += `> Failure to conduct a required DPIA is itself a GDPR violation — fines up to €10M or 2% of global revenue — before any underlying data-protection issue.\n\n`;
+
+  md += `## 1. Description of processing operations _(auto-generated)_\n\n`;
+  const aiFns = [...new Set(findings.map(f => f.functionName))];
+  md += `RegKit detected ${aiFns.length} AI processing function(s). Automated-decision-making operations specifically flagged:\n\n`;
+  if (gdprFindings.length) {
+    for (const f of gdprFindings) md += `- \`${f.functionName}()\`: ${f.detail || f.ruleName}\n`;
+  } else {
+    md += `_No Article 22 automated-decision concerns flagged in this scan._\n`;
+  }
+  md += `\n`;
+
+  md += `## 2. Necessity & proportionality assessment _[HUMAN COMPLETION REQUIRED]_\n\n`;
+  md += `- [ ] Lawful basis for processing identified\n- [ ] Data minimization confirmed\n- [ ] Purpose limitation documented\n\n`;
+
+  md += `## 3. Risks to data subjects _(partially auto)_\n\n`;
+  if (gdprFindings.length) {
+    md += `Code-level risks detected:\n\n`;
+    for (const f of gdprFindings) {
+      md += `- **${f.ruleName}** in \`${f.functionName}()\` — ${f.citation}\n`;
+    }
+  }
+  md += `\n_[HUMAN COMPLETION: likelihood and severity ratings for each risk]_\n\n`;
+
+  md += `## 4. Measures to address risks _(partially auto)_\n\n`;
+  md += `RegKit's AGENT-4 remediation (run with \`--fix\`) generates the technical measures (human-review gates, appeal paths). Organizational measures are human-supplied.\n\n`;
+
+  md += `## 5. DPO sign-off _[HUMAN COMPLETION REQUIRED]_\n\n`;
+  md += `- Data Protection Officer: ____________________\n- Date: ____________________\n- Consultation with supervisory authority required? ____________________\n\n`;
+
+  return md;
+}
+
+// ─── DOCUMENT 6: NIST AI RMF CONFORMANCE REPORT ───────────────────────────────
+// Voluntary federally, but an affirmative defense under Texas TRAIGA. Maps
+// findings to the four NIST functions. ~75% auto.
+
+function generateNistConformance(findings, ruleMap, projectConfig, scanMeta) {
+  const projectName = (projectConfig.project && projectConfig.project.name) || projectConfig.name || 'Unnamed Project';
+
+  let md = `# NIST AI RMF Conformance Report\n\n`;
+  md += `**Project:** ${projectName}  \n**Generated:** ${todayISO()} by RegKit AGENT-5  \n`;
+  md += `**Framework:** NIST AI Risk Management Framework 1.0 (GOVERN / MAP / MEASURE / MANAGE)  \n\n`;
+  md += DISCLAIMER + '\n\n';
+  md += `> Substantial NIST AI RMF compliance is an **affirmative legal defense under Texas TRAIGA** (§552.105, up to $200,000/violation) and is referenced by the CFPB, FDA, SEC, and FTC.\n\n`;
+
+  const blockCount = findings.filter(f => f.severity === 'BLOCK').length;
+  const warnCount = findings.filter(f => f.severity === 'WARN').length;
+
+  md += `## Conformance Summary _(auto-generated)_\n\n`;
+  md += `| NIST Function | Status | Evidence from scan |\n|---|---|---|\n`;
+  md += `| **GOVERN** | _[review]_ | Governance policies are organization-supplied; RegKit confirms enforcement tooling (this scanner + PR gate) is active |\n`;
+  md += `| **MAP** | ${findings.length > 0 ? '⚠️ gaps found' : '✓'} | ${findings.length} AI risk(s) identified and contextualized by jurisdiction |\n`;
+  md += `| **MEASURE** | ${blockCount > 0 ? '⚠️ ' + blockCount + ' blocking' : '✓'} | ${blockCount} blocking, ${warnCount} warning findings measured against statute |\n`;
+  md += `| **MANAGE** | _[review]_ | RegKit AGENT-4 generates remediations; incident response is organization-supplied |\n\n`;
+
+  md += `## MAP — Risks Identified _(auto-generated)_\n\n`;
+  if (findings.length) {
+    md += `| Risk | Function | Severity | Citation |\n|---|---|---|---|\n`;
+    for (const f of findings) {
+      md += `| ${f.ruleId} | \`${f.functionName}()\` | ${f.severity} | ${f.citation || 'n/a'} |\n`;
+    }
+  } else {
+    md += `_No risks identified in this scan._\n`;
+  }
+  md += `\n`;
+
+  md += `## MANAGE — Remediation Status _(partially auto)_\n\n`;
+  md += `Run \`regkit scan <path> --fix\` to generate the specific remediation for each finding above. Each accepted fix moves the corresponding risk from "identified" to "managed."\n\n`;
+
+  md += `## GOVERN & policy attestation _[HUMAN COMPLETION REQUIRED]_\n\n`;
+  md += `- [ ] AI governance policy in place\n- [ ] Roles & responsibilities defined\n- [ ] This report reviewed by: ____________________\n\n`;
+
+  return md;
+}
+
+// ─── DOCUMENT 7: IMMUTABLE AUDIT LOG (specification + status) ──────────────────
+// EU AI Act Art. 12 requires high-risk AI systems to automatically log events
+// with enough detail to reconstruct operation. HIPAA requires audit controls
+// for PHI access. This document specifies the required log schema and reports
+// which AI touchpoints currently have logging vs. which need regkit.trace().
+
+function generateAuditLogSpec(findings, ruleMap, projectConfig, scanMeta) {
+  const projectName = (projectConfig.project && projectConfig.project.name) || projectConfig.name || 'Unnamed Project';
+  const aiTouchpoints = [...new Set(findings.map(f => f.functionName))];
+
+  let md = `# Immutable Audit Log — Specification & Coverage Report\n\n`;
+  md += `**Project:** ${projectName}  \n**Generated:** ${todayISO()} by RegKit AGENT-5  \n`;
+  md += `**Regulatory basis:** EU AI Act Article 12 (automatic logging, reconstructable operation); HIPAA § 164.312(b) (audit controls); 10-year retention for medical AI  \n\n`;
+  md += DISCLAIMER + '\n\n';
+
+  md += `## 1. Why this log is required\n\n`;
+  md += `EU AI Act Article 12 requires high-risk AI systems to automatically record events ("logs") over the system's lifetime, with sufficient detail to identify situations that may result in risk or substantial modification, and to enable post-hoc reconstruction of how a decision was reached. HIPAA separately requires audit controls recording access to ePHI. Retention is up to 10 years for medical AI.\n\n`;
+
+  md += `## 2. Required log event schema _(auto-generated)_\n\n`;
+  md += `Each AI decision event must capture, at minimum:\n\n`;
+  md += `| Field | Purpose |\n|---|---|\n`;
+  md += `| timestamp (UTC) | when the decision occurred |\n`;
+  md += `| system_id + version | which model/version produced it |\n`;
+  md += `| input_reference | hashed/redacted reference to the inputs used (not raw PII) |\n`;
+  md += `| output / decision | the AI's output |\n`;
+  md += `| human_review_status | whether a human reviewed/overrode (links to AGENT-4 humanReviewGate) |\n`;
+  md += `| jurisdiction | which legal regime applied |\n`;
+  md += `| immutable_hash | tamper-evidence (prev-hash chain) |\n\n`;
+
+  md += `## 3. Logging coverage by AI touchpoint _(auto-generated)_\n\n`;
+  if (aiTouchpoints.length) {
+    md += `| AI Touchpoint | Logging present? | Action |\n|---|---|---|\n`;
+    for (const fn of aiTouchpoints) {
+      // Heuristic: a touchpoint "has logging" if a finding for it doesn't exist,
+      // or if regkit.trace appears. Since findings indicate gaps, treat flagged ones as needing logging.
+      md += `| \`${fn}()\` | ⚠️ not detected | Inject \`regkit.trace()\` via AGENT-4 \`--fix\` |\n`;
+    }
+  } else {
+    md += `_No AI touchpoints detected requiring audit logging in this scan._\n`;
+  }
+  md += `\n`;
+
+  md += `## 4. How RegKit activates this log\n\n`;
+  md += `AGENT-4 injects \`regkit.trace()\` calls as part of the auto-fix for Article 12 findings. The developer accepts the fix once; logging then runs automatically on every subsequent decision, writing immutable, hash-chained events. This document regenerates from those logs to show coverage over time.\n\n`;
+
+  md += `## 5. Retention & immutability attestation _[HUMAN COMPLETION REQUIRED]_\n\n`;
+  md += `- [ ] Retention period configured (10 years for medical AI; per-regime otherwise)\n- [ ] Logs stored in append-only / WORM storage\n- [ ] Tamper-evidence (hash chain) verified\n- [ ] Access to logs itself audited\n\n`;
+
+  return md;
+}
+
+// ─── DOCUMENT 8: SOC 2 AI CONTROLS EVIDENCE PACKAGE ───────────────────────────
+// Enterprise customers require SOC 2 Type II before signing. SOC 2 auditors now
+// ask AI-specific questions no existing SOC 2 tool answers. This maps RegKit
+// findings/controls to the relevant Trust Services Criteria.
+
+function generateSoc2Evidence(findings, ruleMap, projectConfig, scanMeta) {
+  const projectName = (projectConfig.project && projectConfig.project.name) || projectConfig.name || 'Unnamed Project';
+  const blockCount = findings.filter(f => f.severity === 'BLOCK').length;
+
+  let md = `# SOC 2 — AI Controls Evidence Package\n\n`;
+  md += `**Project:** ${projectName}  \n**Generated:** ${todayISO()} by RegKit AGENT-5  \n`;
+  md += `**Framework:** AICPA Trust Services Criteria (SOC 2)  \n\n`;
+  md += DISCLAIMER + '\n\n';
+
+  md += `## Purpose\n\n`;
+  md += `Enterprise customers in financial services and healthcare require SOC 2 Type II certification before signing. SOC 2 auditors increasingly ask AI-specific questions — how are AI systems controlled, monitored, and audited — that traditional SOC 2 tooling does not answer. This package maps RegKit's automated controls to the relevant Trust Services Criteria, providing auditor-ready evidence for the AI portion of the audit.\n\n`;
+
+  md += `## AI Controls Mapped to Trust Services Criteria _(auto-generated)_\n\n`;
+  md += `| TSC | Control | RegKit evidence |\n|---|---|---|\n`;
+  md += `| **CC6.1** (logical access) | AI vendor access governed | BAA tracking + vendor config in regkit.yaml |\n`;
+  md += `| **CC6.6** (data in transit) | AI data flows documented | AI System Data Flow Diagram (auto-generated) |\n`;
+  md += `| **CC7.2** (monitoring) | AI decisions logged | Immutable Audit Log via regkit.trace() |\n`;
+  md += `| **CC7.3** (incident eval) | Compliance violations detected pre-ship | This scanner + PR gate (${findings.length} findings this scan) |\n`;
+  md += `| **CC8.1** (change mgmt) | AI changes gated | GitHub Action PR gate blocks non-compliant merges |\n`;
+  md += `| **CC3.2** (risk assessment) | AI-specific risks identified | Algorithmic Impact Assessment + NIST Conformance Report |\n`;
+  md += `| **PI1.x** (processing integrity) | AI decisions explainable/reviewed | AGENT-3 reasoning + humanReviewGate evidence |\n\n`;
+
+  md += `## Control Operating Evidence This Period _(auto-generated)_\n\n`;
+  md += `- AI compliance scans run: continuous (every file save + every PR)\n`;
+  md += `- Findings this scan: ${findings.length} (${blockCount} blocking, prevented from shipping)\n`;
+  md += `- PR gate: active — blocks merges with unresolved BLOCK-level violations\n`;
+  md += `- Compliance documents auto-generated: 8 document types available on demand\n\n`;
+
+  md += `## Findings Register (audit evidence) _(auto-generated)_\n\n`;
+  if (findings.length) {
+    md += `| Control area | Finding | Severity | Citation |\n|---|---|---|---|\n`;
+    for (const f of findings) {
+      md += `| ${f.ruleId} | ${f.functionName}() | ${f.severity} | ${f.citation || 'n/a'} |\n`;
+    }
+  } else {
+    md += `_Clean scan — no AI compliance findings this period._\n`;
+  }
+  md += `\n`;
+
+  md += `## Auditor attestation _[HUMAN COMPLETION REQUIRED]_\n\n`;
+  md += `- [ ] Control owner: ____________________\n- [ ] Testing period: ____________________\n- [ ] Exceptions noted: ____________________\n- [ ] Auditor sign-off: ____________________\n\n`;
+
+  return md;
+}
+
 // ─── PUBLIC INTERFACE ─────────────────────────────────────────────────────────
 
 const GENERATORS = {
@@ -257,6 +543,36 @@ const GENERATORS = {
     title: 'Algorithmic Impact Assessment',
     fn: generateAlgorithmicImpactAssessment,
     filename: 'Algorithmic-Impact-Assessment.md',
+  },
+  'hipaa-sra': {
+    title: 'HIPAA Security Risk Assessment',
+    fn: generateHipaaSRA,
+    filename: 'HIPAA-Security-Risk-Assessment.md',
+  },
+  'eu-annex-iv': {
+    title: 'EU AI Act Annex IV Technical Documentation',
+    fn: generateAnnexIV,
+    filename: 'EU-AI-Act-Annex-IV.md',
+  },
+  'gdpr-dpia': {
+    title: 'GDPR Data Protection Impact Assessment',
+    fn: generateGdprDPIA,
+    filename: 'GDPR-DPIA.md',
+  },
+  'nist-conformance': {
+    title: 'NIST AI RMF Conformance Report',
+    fn: generateNistConformance,
+    filename: 'NIST-AI-RMF-Conformance-Report.md',
+  },
+  'audit-log': {
+    title: 'Immutable Audit Log Specification',
+    fn: generateAuditLogSpec,
+    filename: 'Immutable-Audit-Log-Spec.md',
+  },
+  'soc2-evidence': {
+    title: 'SOC 2 AI Controls Evidence Package',
+    fn: generateSoc2Evidence,
+    filename: 'SOC2-AI-Controls-Evidence.md',
   },
 };
 

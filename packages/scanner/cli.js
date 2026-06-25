@@ -19,6 +19,9 @@ const { loadRules, parseSource, findEnclosingFunction } = require('./core');
 const { runDetector } = require('./detectors');
 const { runAgent3 } = require('./agent3');
 const { generateEvidence } = require('./agent5');
+const { remediateAll } = require('./agent4');
+const { runIntelligenceCheck, formatReport } = require('./agent7');
+const { classifyContext, mapApplicableRules, summarize } = require('./agents12');
 
 function loadProjectConfig(configPath) {
   if (!fs.existsSync(configPath)) {
@@ -87,6 +90,12 @@ async function scan(targetPath, rulesDir, configPath, options = {}) {
 
   const projectConfig = loadProjectConfig(configPath);
   const files = findSourceFiles(targetPath);
+
+  // ─── AGENT-1: classify context, AGENT-2: map applicable rules ───
+  const context = classifyContext(projectConfig);
+  const mapping = mapApplicableRules(context, rules);
+  const applicableRules = mapping.applicable.map(a => a.rule);
+  log(chalk.gray(summarize(context, mapping)));
   log(chalk.gray(`Scanning ${files.length} source file(s) in ${targetPath}\n`));
 
   const allFindings = [];
@@ -106,7 +115,7 @@ async function scan(targetPath, rulesDir, configPath, options = {}) {
     }
     fileSources[file] = { sourceCode, ast };
 
-    for (const rule of rules) {
+    for (const rule of applicableRules) {
       const result = runDetector(rule, ast, sourceCode, file, projectConfig);
       detectorStats[result.status] = (detectorStats[result.status] || 0) + 1;
       if (result.status === 'OK') wiredRuleIds.add(rule.id);
@@ -167,6 +176,45 @@ async function scan(targetPath, rulesDir, configPath, options = {}) {
   }
   log('');
 
+  // ─── AGENT-4 REMEDIATION (optional) ───
+  if (options.fix && allFindings.length > 0) {
+    const ruleMapForFix = {};
+    for (const r of rules) ruleMapForFix[r.id] = r;
+    const codeContextForFix = (finding) => {
+      const fileData = fileSources[finding.file];
+      if (!fileData) return finding.codeSnippet || '';
+      const lines = fileData.sourceCode.split('\n');
+      const start = Math.max(0, finding.line - 3);
+      const end = Math.min(lines.length, finding.line + 6);
+      return lines.slice(start, end).join('\n');
+    };
+    const remediations = await remediateAll(allFindings, ruleMapForFix, codeContextForFix, options);
+
+    if (!options.quiet) {
+      log(chalk.cyan(`\nAGENT-4: remediation suggestions\n`));
+      for (const { finding, remediation } of remediations) {
+        const fixable = remediation.autoFixable ? chalk.green('auto-fixable') : chalk.yellow('manual — architecture change');
+        log(`${chalk.bold(finding.ruleId)} in ${chalk.magenta(finding.functionName)} ${chalk.gray('[' + fixable + ']')}`);
+        log(`  ${chalk.gray(remediation.explanation)}`);
+        if (remediation.fix && remediation.fix.patch) {
+          log(chalk.dim('  ' + remediation.fix.note));
+          for (const line of remediation.fix.patch.split('\n')) {
+            log(chalk.green('  + ') + chalk.dim(line));
+          }
+        }
+        log('');
+      }
+    }
+    // attach remediations to findings for JSON output
+    const remByKey = {};
+    for (const { finding, remediation } of remediations) {
+      remByKey[finding.ruleId + ':' + finding.line] = remediation;
+    }
+    for (const f of allFindings) {
+      f.remediation = remByKey[f.ruleId + ':' + f.line] || null;
+    }
+  }
+
   // ─── AGENT-5 EVIDENCE GENERATION (optional) ───
   if (options.evidence) {
     const ruleMapForEvidence = {};
@@ -195,8 +243,29 @@ async function main() {
   const args = process.argv.slice(2);
   const command = args[0];
 
+  // AGENT-7 regulatory intelligence check — independent of code scanning
+  if (command === 'intel') {
+    const rulesIdx = args.indexOf('--rules');
+    const rulesDir = rulesIdx > -1 ? args[rulesIdx + 1] : path.join(__dirname, 'rules');
+    let result = runIntelligenceCheck(rulesDir);
+    if (args.includes('--live')) {
+      const { checkSourcesLive } = require('./agent7');
+      console.log(chalk.cyan('AGENT-7: checking official sources are live...'));
+      result = await checkSourcesLive(result);
+    }
+    const outIdx = args.indexOf('--out');
+    const report = formatReport(result);
+    if (outIdx > -1) {
+      fs.writeFileSync(args[outIdx + 1], report);
+      console.log(chalk.green(`Regulatory intelligence report written to ${args[outIdx + 1]}`));
+    } else {
+      console.log(report);
+    }
+    process.exit(0);
+  }
+
   if (command !== 'scan') {
-    console.log('Usage: regkit scan <path> [--rules <dir>] [--config <file>]');
+    console.log('Usage:\n  regkit scan <path> [--config <file>] [--reason] [--fix] [--evidence] [--format json]\n  regkit intel [--out <file>]   (AGENT-7 regulatory intelligence check)');
     process.exit(1);
   }
 
@@ -218,6 +287,7 @@ async function main() {
     forceMock: args.includes('--mock'),      // force mock even if a key exists
     includeAll: args.includes('--all'),      // keep DISMISSED findings in output
     evidence: args.includes('--evidence'),   // run AGENT-5 document generation
+    fix: args.includes('--fix'),             // run AGENT-4 remediation suggestions
     quiet: format === 'json',                // suppress pretty output for machine formats
   };
 

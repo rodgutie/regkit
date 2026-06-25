@@ -101,6 +101,32 @@ AGENT-3 annotates each finding with a verdict:
 Flags: `--reason` (enable AGENT-3), `--mock` (force mock even with a key),
 `--all` (keep DISMISSED findings in output).
 
+## The 7-agent pipeline
+
+RegKit runs a 7-agent compliance pipeline. All seven are now built:
+
+| Agent | Role | How to run |
+|---|---|---|
+| **AGENT-1** Context Classifier | Reads regkit.yaml → industry, jurisdictions, risk tier, data categories | automatic, every scan |
+| **AGENT-2** Regulation Mapper | Maps context → the subset of rules that actually apply (a TX-only project skips CA/IL rules) | automatic, every scan |
+| **AGENT-3** Legal Interpreter | Reasons over each finding: CONFIRMED / DISMISSED / NEEDS_HUMAN (Claude or mock) | `--reason` |
+| **AGENT-4** Remediation | Generates the actual fix code + RegKit scaffold calls | `--fix` |
+| **AGENT-5** Evidence Compiler | Generates 6 compliance documents from findings | `--evidence` |
+| **AGENT-6** Continuous Monitor | Re-scan on every change (via the GitHub Action PR gate) | the Action |
+| **AGENT-7** Regulatory Intelligence | Monitors official sources, flags rules whose law may have changed | `regkit intel` |
+
+Full pipeline in one command:
+
+```bash
+node cli.js scan <path> --config <regkit.yaml> --reason --fix --evidence
+```
+
+Regulatory intelligence check (AGENT-7), separate from code scanning:
+
+```bash
+node cli.js intel --out regulatory-report.md
+```
+
 ## AGENT-5 — the compliance document generator
 
 Run with `--evidence`:
@@ -111,26 +137,21 @@ node cli.js scan <path> --config <regkit.yaml> --evidence
 
 AGENT-5 takes the scan findings and auto-generates the compliance
 documents regulators and auditors demand, writing them to a
-`regkit-evidence/` folder. MVP generates the two documents fed by the most
-rules:
+`regkit-evidence/` folder. It generates all 8 document types:
 
-- **AI System Data Flow Diagram** (fed by 10 of 13 rules, 100% auto) — a
-  GitHub-native Mermaid diagram plus a data-flow inventory table plus the
-  attached compliance obligations with real statutory citations. Answers
-  the first question every auditor asks: what data goes into your AI and
-  where does the output go.
-- **Algorithmic Impact Assessment** (fed by 5 rules, ~60% auto) —
-  auto-fills system description, detected proxy variables, and a
-  jurisdiction-by-jurisdiction obligations table, then explicitly marks the
-  bias-testing-results, mitigation, and sign-off sections as
-  `[HUMAN COMPLETION REQUIRED]`. RegKit cannot run a statistical bias audit
-  from source code (and for NYC LL144 the law requires an *independent*
-  auditor), so it generates the scaffold and is honest about the boundary.
+1. **AI System Data Flow Diagram** (Mermaid + inventory, ~100% auto)
+2. **Algorithmic Impact Assessment** (~60% auto)
+3. **HIPAA Security Risk Assessment** (~70% auto)
+4. **EU AI Act Annex IV Technical Documentation** (~80% auto)
+5. **GDPR Data Protection Impact Assessment** (~65% auto)
+6. **NIST AI RMF Conformance Report** (~75% auto)
+7. **Immutable Audit Log Specification** (schema + coverage report)
+8. **SOC 2 AI Controls Evidence Package** (TSC-mapped, auditor-ready)
 
-A compliance officer producing either document manually spends days to
-weeks. AGENT-5 generates the draft as a byproduct of a scan that already
-ran. This is RegKit's commercial engine — the feature that converts a free
-install into a paying compliance-officer champion.
+Each auto-fills what it can from the scan and explicitly marks
+`[HUMAN COMPLETION REQUIRED]` for determinations code can't make (bias-test
+results, risk ratings, sign-offs). See `example-evidence/` for real
+generated samples.
 
 ## GitHub Action — the PR compliance gate
 
