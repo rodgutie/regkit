@@ -1,9 +1,10 @@
-RegKit
+# RegKit
 
-Compliance-native AI development. RegKit catches EU AI Act, HIPAA, GDPR, and other AI compliance violations in your code — before it ships. 13 regulations across federal, European Union, and 7 US jurisdictions, each grounded in actual statutory text — including cases where the same code is legal in one US state and illegal in another.
+**Compliance-native AI development.** RegKit catches EU AI Act, HIPAA, GDPR, and other AI compliance violations in your code — *before it ships*. 13 regulations across federal, European Union, and 7 US jurisdictions, each grounded in actual statutory text — including cases where the same code is legal in one US state and illegal in another.
 
 Think spell-check, but for the law.
 
+```javascript
 async function analyzePatientRisk(patientId) {
   const record = await db.patients.findById(patientId);
 
@@ -18,59 +19,61 @@ async function analyzePatientRisk(patientId) {
   // ^ RegKit: BLOCK — AI decision returned with no human oversight gate
   //   EU AI Act Art. 14 — human oversight required for high-risk AI
 }
+```
 
-Why RegKit exists
+## Status: Working MVP ✅
 
-Every AI compliance tool today either watches your AI after it ships (observability platforms) or manages paperwork manually (GRC platforms). Nobody enforces compliance at the moment a developer writes the code. That gap is what RegKit fills.
+RegKit is built and functional across three surfaces. **[Download the VS Code extension from the latest release →](https://github.com/rodgutie/regkit/releases/latest)**
 
+**Built:**
+- ✅ Tree-sitter AST rule engine
+- ✅ 13 regulation rule sets (federal, EU, 7 US jurisdictions) — see [`rules/`](./rules)
+- ✅ 7-agent pipeline: context classification → rule mapping → Claude-powered legal reasoning → remediation → compliance-document generation
+- ✅ CLI scanner (`regkit scan`)
+- ✅ GitHub Action PR gate (blocks non-compliant merges)
+- ✅ VS Code extension (live inline detection) — [installable .vsix in Releases](https://github.com/rodgutie/regkit/releases/latest)
 
-EU AI Act Art. 50 transparency obligations are enforceable starting August 2, 2026.
-Texas TRAIGA carries fines up to $200,000 per violation — and NIST AI RMF compliance is an affirmative legal defense.
-HIPAA's Security Rule is being overhauled for the first time since 2003.
-Colorado's AI Act takes effect June 30, 2026.
+**Next:** VS Code Marketplace publish · expanded rule coverage
 
+## Install the VS Code extension
+
+1. Download `regkit-0.1.0.vsix` from the [latest release](https://github.com/rodgutie/regkit/releases/latest)
+2. In VS Code: Extensions panel → "..." menu → **Install from VSIX...** → select the file
+3. Open any `.js`/`.ts` file with an AI call and watch RegKit flag compliance issues inline, with the actual legal citation
+
+## Why RegKit exists
+
+Every AI compliance tool today either watches your AI *after* it ships (observability platforms) or manages paperwork manually (GRC platforms). Nobody enforces compliance at the moment a developer writes the code. That gap is what RegKit fills.
+
+- EU AI Act Art. 50 transparency obligations are enforceable starting **August 2, 2026**.
+- Texas TRAIGA carries fines up to **$200,000 per violation** — and NIST AI RMF compliance is an affirmative legal defense.
+- HIPAA's Security Rule is being overhauled for the first time since 2003.
+- Colorado's AI Act takes effect **June 30, 2026**.
 
 Most engineering teams building AI features have no idea any of this applies to their code until an auditor, a regulator, or a lawsuit tells them.
 
-What RegKit does
+## What RegKit does
 
+- **Scans your code as you write it** — VS Code extension shows inline violations, same feel as a linter
+- **Explains the law in plain English** — no legal degree required to understand why something is flagged
+- **Generates compliance documents** — EU AI Act Annex IV, HIPAA Security Risk Assessments, GDPR DPIAs, SOC 2 evidence, and more, drafted automatically from your codebase (see [`packages/scanner/example-evidence/`](./packages/scanner))
+- **Blocks non-compliant merges** — GitHub Action gate stops violations before they reach production
+- **Jurisdiction-aware** — the same code can be legal in one US state and illegal in another; RegKit knows the difference
 
-Scans your code as you write it — VS Code extension shows inline violations, same feel as a linter
-Explains the law in plain English — no legal degree required to understand why something is flagged
-Generates the fix — not just a warning, the actual replacement code
-Blocks non-compliant merges — GitHub Action gate stops violations before they reach production
-Auto-generates compliance documents — EU AI Act Annex IV, HIPAA Security Risk Assessments, GDPR DPIAs, and more, drafted automatically from your codebase
+## How it's built
 
+- **Engine:** Node.js + tree-sitter AST analysis
+- **Legal reasoning:** Anthropic Claude API (bring-your-own-key — your code goes directly to Anthropic under your own key, never through RegKit's servers)
+- **Rules:** open YAML definitions so anyone can inspect exactly what RegKit checks for and why
 
-Status
-
-🚧 Early development. This repository will fill in over the coming weeks with the rule engine, VS Code extension, and CLI. Follow along or star the repo to track progress.
-
-Roadmap
-
-
- Core rule engine (tree-sitter based AST analysis)
- First 30 rules: EU AI Act, HIPAA, GDPR core requirements
- VS Code extension (alpha)
- CLI: regkit scan, regkit gate
- GitHub Action for PR gating
- Evidence document generator
- Public launch on VS Code Marketplace
-
-
-Why open source
+## Why open source
 
 The rule definitions are open so developers and compliance teams can inspect exactly what RegKit checks for and why. Trust requires transparency — especially for a tool that tells you what the law requires.
 
-Get involved
+## License
 
-This is being built in public. Follow progress on X: @regkit (or your handle)
+MIT — see [LICENSE](./LICENSE)
 
-Found a regulation RegKit should cover? Open an issue.
+---
 
-License
-
-MIT — see LICENSE
-
-
-RegKit is a compliance intelligence tool, not a law firm. Always consult qualified legal counsel for final compliance decisions.
+*RegKit is a compliance intelligence tool, not a law firm. Always consult qualified legal counsel for final compliance decisions.*
